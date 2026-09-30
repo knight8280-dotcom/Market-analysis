@@ -243,3 +243,28 @@ describe("SecEdgarProvider against recorded edge cases (2026-09-30)", () => {
     await expect(p.getFundamentals({ cik: "43" })).rejects.toThrow(/names CIK 42/);
   });
 });
+
+describe("getSubmissions", () => {
+  it("returns registrant metadata with the filings (Apple, recorded)", async () => {
+    const f = fixtureFetch({
+      "/submissions/CIK0000320193.json":
+        "sec-edgar/recorded/submissions-CIK0000320193.trimmed.json",
+    });
+    const p = new SecEdgarProvider({
+      appName: "Market Analysis",
+      contactEmail: "admin@example.com",
+      rateLimiter: { acquire: () => Promise.resolve(0) },
+      baseUrl: "https://sec.test",
+      fetch: f.fetch,
+    });
+    const { entity, filings } = await p.getSubmissions({ cik: "320193" });
+    expect(entity).toMatchObject({
+      cik: "0000320193",
+      name: "Apple Inc.",
+      sicCode: "3571",
+      tickers: ["AAPL"],
+    });
+    expect(entity.sicDescription).toMatch(/computers/i);
+    expect(filings).toHaveLength(6);
+  });
+});

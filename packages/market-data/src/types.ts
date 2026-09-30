@@ -14,6 +14,7 @@ export const PROVIDER_IDS = [
   "sec_edgar",
   "fred",
   "treasury",
+  "finnhub",
 ] as const;
 export const ProviderId = z.enum(PROVIDER_IDS);
 export type ProviderId = z.infer<typeof ProviderId>;
@@ -25,6 +26,7 @@ export const DATASETS = [
   "fundamentals",
   "filings",
   "macro",
+  "earnings",
 ] as const;
 export const Dataset = z.enum(DATASETS);
 export type Dataset = z.infer<typeof Dataset>;

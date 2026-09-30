@@ -47,6 +47,10 @@ const TickerExchangePayload = z.object({
 const SubmissionsPayload = z.object({
   cik: z.string(),
   name: z.string(),
+  sic: z.string().nullable().optional(),
+  sicDescription: z.string().nullable().optional(),
+  tickers: z.array(z.string()).optional(),
+  exchanges: z.array(z.string().nullable()).optional(),
   filings: z.object({
     recent: z.object({
       accessionNumber: z.array(z.string()),
@@ -103,6 +107,14 @@ export interface TickerMapEntry {
   name: string;
   ticker: string;
   exchange: string | null;
+}
+
+export interface EdgarEntity {
+  cik: string;
+  name: string;
+  sicCode: string | null;
+  sicDescription: string | null;
+  tickers: string[];
 }
 
 export interface SecEdgarOptions extends Pick<
@@ -170,10 +182,25 @@ export class SecEdgarProvider extends BaseProvider {
    * listed under `filings.files` are left to the bulk submissions.zip path (RUNBOOK).
    */
   override async getFilings(req: { cik: string }): Promise<FilingRecord[]> {
+    return (await this.getSubmissions(req)).filings;
+  }
+
+  /** One submissions request: registrant metadata (name, SIC) plus recent filings. */
+  async getSubmissions(req: {
+    cik: string;
+  }): Promise<{ entity: EdgarEntity; filings: FilingRecord[] }> {
     const cik = padCik(req.cik);
     const fetchedAt = this.now();
     const raw = await this.http.getJson(`${this.dataBase}/submissions/CIK${cik}.json`);
     const payload = parseVendor(this.id, SubmissionsPayload, raw, "submissions");
+    const sic = payload.sic && /^\d{3,4}$/.test(payload.sic) ? payload.sic : null;
+    const entity: EdgarEntity = {
+      cik,
+      name: payload.name,
+      sicCode: sic,
+      sicDescription: payload.sicDescription || null,
+      tickers: payload.tickers ?? [],
+    };
     const r = payload.filings.recent;
     const n = r.accessionNumber.length;
     for (const column of [
@@ -227,7 +254,7 @@ export class SecEdgarProvider extends BaseProvider {
         ),
       );
     }
-    return filings;
+    return { entity, filings };
   }
 
   /** Every XBRL fact in companyfacts, one record per (filing, concept, unit, period). */

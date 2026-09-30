@@ -8,6 +8,7 @@ import { buildProviders, routingFromEnv } from "./providers";
 import { QUEUES } from "./queues";
 import { startRuntime } from "./runtime";
 import { DEFAULT_SCHEDULE, dueJobs } from "./scheduler";
+import { loadUniverse } from "./universe";
 
 /**
  * Long-running worker (spec §3.1): BullMQ workers for every queue plus a 30-second scheduler
@@ -29,7 +30,8 @@ async function main(): Promise<void> {
       await publisher.publish("market-events", JSON.stringify(event));
     },
   };
-  const providers = buildProviders(env, { limiterRedis });
+  const universe = loadUniverse(env.UNIVERSE_FILE);
+  const providers = buildProviders(env, { limiterRedis, universe });
   const runtime = startRuntime(
     {
       appEnv: env.APP_ENV,
@@ -39,6 +41,7 @@ async function main(): Promise<void> {
       clock: () => new Date(),
       log,
       events,
+      universe,
     },
     { connection: () => new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }) },
   );

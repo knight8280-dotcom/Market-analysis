@@ -1,7 +1,7 @@
 import type { IsoDate } from "@market/calendar";
 import { z } from "zod";
 import { ProviderError } from "../errors";
-import { HttpClient, type HttpClientOptions } from "../http";
+import { HttpClient, type HttpClientOptions, type RateLimiter } from "../http";
 import { BaseProvider, type SymbolRange } from "../provider";
 import { CorporateAction, DailyBar, SecurityRecord, type AssetClass } from "../types";
 import { exchangeMic, parseVendor, sessionCloseOf } from "./common";
@@ -54,6 +54,8 @@ export interface TiingoOptions extends Pick<
    * fabricate reference data, so securities missing from this map are refused.
    */
   assetClasses?: Readonly<Record<string, AssetClass>>;
+  /** Plan quotas (see tiingoRateLimits); every request waits for a slot. */
+  rateLimiter?: RateLimiter;
   baseUrl?: string;
   now?: () => Date;
 }
@@ -81,6 +83,7 @@ export class TiingoProvider extends BaseProvider {
       allowedHosts: [override ? override.host : TIINGO_HOST],
       headers: { authorization: `Token ${opts.apiKey}` },
       redactQueryParams: ["token"],
+      rateLimiter: opts.rateLimiter,
       fetch: opts.fetch,
       sleep: opts.sleep,
       random: opts.random,

@@ -14,6 +14,17 @@ pnpm --filter @market/web dev        # http://localhost:3000/admin/data-health (
 pnpm --filter @market/worker start   # long-running worker + scheduler
 ```
 
+## Real data (once the Tiingo key arrives)
+
+Personal use only (ADR-015): this data is for the owner's screen, never a public URL.
+
+1. In `.env`: `TIINGO_API_KEY=<key>`, `DATA_PROVIDER_PRIMARY=tiingo`, `DATA_PROVIDER_FALLBACK=none`, and for SEC data `EDGAR_ENABLED=true` with `SEC_CONTACT_EMAIL=<your email>`. Keep the key out of chat and commits.
+2. `pnpm worker verify-tiingo` (3 requests). It parses live responses through the adapter and prints field names and counts only. Record the result and date under Tiingo in `DATA_SOURCES.md`; never save the response.
+3. `pnpm worker bootstrap` loads the universe (`config/universe.json`), attaches SEC CIKs and SIC sectors, loads filings and fundamentals, then ten years of prices. On the free tier the price step is paced by the quota limiter: about 2 hours 40 minutes for 65 symbols. It is safe to stop and re-run; every step is idempotent.
+4. `pnpm worker monitor` should report every SLO as OK. Then start the long-running worker (`pnpm --filter @market/worker start`), which keeps prices current after each close and refreshes SEC data nightly.
+
+To add a symbol: add it to `config/universe.json` with its asset class, then run `pnpm worker bootstrap` again.
+
 ## Tests
 
 | Command                 | Needs                                                                                                     | Runs                                                     |
@@ -38,7 +49,7 @@ pnpm --filter @market/worker start   # long-running worker + scheduler
 | 18:30                                      | EOD freshness deadline; the monitor alerts if coverage < 98% | page → alerts                     |
 | 02:00                                      | reconcile the last 5 sessions (corrections logged)           | `ops.data_corrections`            |
 | 03:00                                      | ensure this year's and next year's partitions exist          | alert kind `partition`            |
-| 18:00 / 21:00                              | FRED series / EDGAR sweep (when enabled)                     | runs for `macro`, `filings`       |
+| 18:00 / 21:00                              | FRED series / EDGAR sweep: new CIKs, then filings (enabled)  | runs for `macro`, `filings`       |
 
 ### Incidents
 

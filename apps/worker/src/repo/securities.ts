@@ -1,6 +1,7 @@
 import type { IsoDate } from "@market/calendar";
 import { sql, type Database } from "@market/db";
-import type { ProviderId, SecurityRecord } from "@market/market-data";
+import { sectorForSic, type ProviderId, type SecurityRecord } from "@market/market-data";
+import type { EdgarEntity } from "@market/market-data/adapters/sec-edgar";
 
 const OPEN_START = "1900-01-01";
 
@@ -53,9 +54,18 @@ export async function upsertSecurityRecord(
     let created = false;
     if (existing) {
       securityId = existing.security_id;
+      // Enrichment from other sources (CIK and SIC sector from EDGAR) is kept when this vendor
+      // does not report it.
       await trx
         .updateTable("market.securities")
-        .set({ ...fields, updated_at: record.fetched_at })
+        .set({
+          ...fields,
+          cik: sql<string | null>`coalesce(${record.cik}, cik)`,
+          figi: sql<string | null>`coalesce(${record.figi}, figi)`,
+          sector: sql<string | null>`coalesce(${record.sector}, sector)`,
+          industry: sql<string | null>`coalesce(${record.industry}, industry)`,
+          updated_at: record.fetched_at,
+        })
         .where("security_id", "=", securityId)
         .execute();
     } else {
@@ -104,6 +114,67 @@ export async function upsertSecurityRecord(
     }
     return { securityId, created };
   });
+}
+
+/**
+ * Equities that could carry an SEC CIK but do not yet. Only securities with a real vendor
+ * mapping qualify: synthetic securities never get real identifiers, so sample data can never be
+ * joined to real filings.
+ */
+export async function securitiesMissingCik(
+  db: Database,
+): Promise<{ security_id: string; ticker: string }[]> {
+  return db
+    .selectFrom("market.securities as s")
+    .select(["s.security_id", "s.ticker"])
+    .where("s.cik", "is", null)
+    .where("s.asset_class", "=", "equity")
+    .where("s.is_active", "=", true)
+    .where((eb) =>
+      eb.exists(
+        eb
+          .selectFrom("market.provider_symbols as ps")
+          .select(sql`1`.as("one"))
+          .whereRef("ps.security_id", "=", "s.security_id")
+          .where("ps.source", "<>", "synthetic"),
+      ),
+    )
+    .orderBy("s.ticker")
+    .execute();
+}
+
+export async function setCik(db: Database, securityId: string, cik: string, at: Date) {
+  await db
+    .updateTable("market.securities")
+    .set({ cik, updated_at: at })
+    .where("security_id", "=", securityId)
+    .where("cik", "is", null)
+    .execute();
+}
+
+/**
+ * Sets the SIC code, industry (SIC description) and sector (mapped from SIC, ADR-016) on every
+ * security with this CIK. Returns how many rows changed.
+ */
+export async function applyEdgarEntity(
+  db: Database,
+  entity: Pick<EdgarEntity, "cik" | "sicCode" | "sicDescription">,
+  at: Date,
+): Promise<number> {
+  if (!entity.sicCode) return 0;
+  const sector = sectorForSic(entity.sicCode);
+  const result = await sql`
+    update market.securities
+    set sic_code = ${entity.sicCode},
+        industry = coalesce(${entity.sicDescription}::text, industry),
+        sector = coalesce(${sector}::text, sector),
+        updated_at = ${at}
+    where cik = ${entity.cik}
+      and (sic_code is distinct from ${entity.sicCode}
+        or industry is distinct from coalesce(${entity.sicDescription}::text, industry)
+        or sector is distinct from coalesce(${sector}::text, sector))
+  `.execute(db);
+  return Number(result.numAffectedRows ?? 0);
 }
 
 export interface SymbolMapping {

@@ -3,6 +3,7 @@ import { loadWorkerEnv } from "@market/config";
 import { createDb, createPool } from "@market/db";
 import { ProviderId } from "@market/market-data";
 import { padCik, SecEdgarProvider } from "@market/market-data/adapters/sec-edgar";
+import { TiingoProvider } from "@market/market-data/adapters/tiingo";
 import { Redis } from "ioredis";
 import type { JobRequest, WorkerContext } from "./context";
 import { InlineDispatcher } from "./dispatch";
@@ -12,12 +13,16 @@ import { createLogger } from "./log";
 import { buildProviders, routingFromEnv } from "./providers";
 import { JOBS, jobId } from "./queues";
 import { mappingsFor } from "./repo/securities";
+import { loadUniverse } from "./universe";
 
 /**
  * Operator CLI: runs job handlers in-process (no queue) for backfills, one-off ingests, the live
  * EDGAR acceptance run and monitor checks. Usage: pnpm worker <command> [--flags].
  *
+ *   bootstrap [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--source tiingo]
+ *   verify-tiingo [--symbol SPY]
  *   ingest-securities [--source synthetic]
+ *   attach-edgar-ids
  *   backfill --from YYYY-MM-DD --to YYYY-MM-DD [--source synthetic] [--symbols A,B]
  *   eod --date YYYY-MM-DD [--source synthetic]
  *   reconcile --through YYYY-MM-DD [--days 5]
@@ -42,27 +47,37 @@ const list = (v: string | undefined) =>
     : undefined;
 const print = (value: unknown) => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 
+/** The same calendar date `years` earlier (29 February rolls to 1 March). */
+function yearsBefore(date: string, years: number): string {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y - years, m - 1, d)).toISOString().slice(0, 10);
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2];
   const env = loadWorkerEnv();
   const log = createLogger(env.LOG_LEVEL);
   const pool = createPool(env.DATABASE_URL, { max: 4, applicationName: "worker-cli" });
   const db = createDb(pool);
-  const limiterRedis = env.EDGAR_ENABLED
-    ? new Redis(env.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
-    : undefined;
+  // Quota-limited vendors share Redis rate limiters with the running worker.
+  const limiterRedis =
+    env.EDGAR_ENABLED || env.TIINGO_API_KEY
+      ? new Redis(env.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
+      : undefined;
   const at = flag("at");
   const clock = at ? () => new Date(at) : () => new Date();
   const dispatcher = new InlineDispatcher();
+  const universe = loadUniverse(env.UNIVERSE_FILE);
   const ctx: WorkerContext = {
     appEnv: env.APP_ENV,
     db,
-    providers: buildProviders(env, { limiterRedis, now: clock }),
+    providers: buildProviders(env, { limiterRedis, now: clock, universe }),
     routes: routingFromEnv(env),
     clock,
     log,
     events: { emit: (event) => log.info({ event }, "event") },
     dispatch: dispatcher,
+    universe,
   };
   const source = flag("source") ? ProviderId.parse(flag("source")) : undefined;
   const failures: { job: string; error: string }[] = [];
@@ -74,10 +89,53 @@ async function main(): Promise<void> {
     );
   const started = Date.now();
 
+  /** Queues and runs one EOD job per mapped symbol of `source`, then sums their run records. */
+  const backfill = async (from: string, to: string, src: ProviderId) => {
+    const symbols =
+      list(flag("symbols")) ??
+      (
+        await db
+          .selectFrom("market.provider_symbols")
+          .select("source_symbol")
+          .distinct()
+          .where("source", "=", src)
+          .orderBy("source_symbol")
+          .execute()
+      ).map((r) => r.source_symbol);
+    for (const symbol of symbols) {
+      if ((await mappingsFor(db, src, symbol)).length === 0) continue;
+      await dispatcher.dispatch({
+        name: JOBS.ingestEod,
+        data: { symbol, start: from, end: to, source: src },
+        jobId: jobId(JOBS.ingestEod, "backfill", from, to, symbol),
+      });
+    }
+    const jobs = await drain();
+    const rows = await db
+      .selectFrom("ops.data_ingestion_runs")
+      .select((eb) => [
+        eb.fn.sum<string>("rows_fetched").as("fetched"),
+        eb.fn.sum<string>("rows_inserted").as("inserted"),
+        eb.fn.sum<string>("rows_updated").as("updated"),
+        eb.fn.sum<string>("rows_unchanged").as("unchanged"),
+        eb.fn.sum<string>("rows_rejected").as("rejected"),
+        eb.fn.sum<string>("rows_flagged").as("flagged"),
+      ])
+      .where("job_name", "=", JOBS.ingestEod)
+      .where("started_at", ">=", new Date(started))
+      .executeTakeFirst();
+    return { from, to, source: src, symbols: symbols.length, jobs, rows };
+  };
+
   try {
     switch (command) {
       case "ingest-securities":
         print(await runJob(ctx, JOBS.ingestSecurities, { source }));
+        break;
+
+      case "attach-edgar-ids":
+        print(await runJob(ctx, JOBS.attachEdgarIds, {}));
+        print(await drain());
         break;
 
       case "backfill": {
@@ -87,44 +145,59 @@ async function main(): Promise<void> {
         const sec = (await runJob(ctx, JOBS.ingestSecurities, { source })) as {
           source: ProviderId;
         };
-        const symbols =
-          list(flag("symbols")) ??
-          (
-            await db
-              .selectFrom("market.provider_symbols")
-              .select("source_symbol")
-              .distinct()
-              .where("source", "=", sec.source)
-              .orderBy("source_symbol")
-              .execute()
-          ).map((r) => r.source_symbol);
-        for (const symbol of symbols) {
-          if ((await mappingsFor(db, sec.source, symbol)).length === 0) continue;
-          await dispatcher.dispatch({
-            name: JOBS.ingestEod,
-            data: { symbol, start: from, end: to, source: sec.source },
-            jobId: jobId(JOBS.ingestEod, "backfill", from, to, symbol),
-          });
-        }
-        const result = await drain();
-        const runs = await db
-          .selectFrom("ops.data_ingestion_runs")
-          .select((eb) => [
-            eb.fn.sum<string>("rows_fetched").as("fetched"),
-            eb.fn.sum<string>("rows_inserted").as("inserted"),
-            eb.fn.sum<string>("rows_updated").as("updated"),
-            eb.fn.sum<string>("rows_unchanged").as("unchanged"),
-            eb.fn.sum<string>("rows_rejected").as("rejected"),
-            eb.fn.sum<string>("rows_flagged").as("flagged"),
-          ])
-          .where("job_name", "=", JOBS.ingestEod)
-          .where("started_at", ">=", new Date(started))
-          .executeTakeFirst();
         print({
-          symbols: symbols.length,
-          jobs: result,
-          rows: runs,
+          ...(await backfill(from, to, sec.source)),
           seconds: (Date.now() - started) / 1000,
+        });
+        break;
+      }
+
+      // One-time setup (plan step A6): the universe's securities, their SEC ids and sectors,
+      // filings and fundamentals, then ten years of prices. Safe to re-run: every step is
+      // idempotent. On Tiingo's free tier the price step is paced by the shared quota limiter.
+      case "bootstrap": {
+        const to = flag("to") ?? latestClosedSession(clock()).date;
+        const from = flag("from") ?? yearsBefore(to, 10);
+        const securities = (await runJob(ctx, JOBS.ingestSecurities, { source })) as {
+          source: ProviderId;
+        };
+        const edgar = ctx.providers.has("sec_edgar")
+          ? { attach: await runJob(ctx, JOBS.attachEdgarIds, {}), jobs: await drain() }
+          : "skipped: set EDGAR_ENABLED=true, APP_NAME and SEC_CONTACT_EMAIL";
+        const prices = await backfill(from, to, securities.source);
+        print({ securities, edgar, prices, seconds: (Date.now() - started) / 1000 });
+        break;
+      }
+
+      // Plan step A4: parse live Tiingo responses through the adapter's schemas. Prints field
+      // names and counts only; vendor responses are never written to disk or committed.
+      case "verify-tiingo": {
+        const tiingo = ctx.providers.get("tiingo");
+        if (!(tiingo instanceof TiingoProvider))
+          throw new Error("Set TIINGO_API_KEY to verify Tiingo");
+        const symbol = flag("symbol") ?? "SPY";
+        const to = latestClosedSession(clock()).date;
+        const range = { symbol, start: yearsBefore(to, 1), end: to };
+        const [security] = await tiingo.getSecurities({ symbols: [symbol] });
+        const bars = await tiingo.getDailyBars(range);
+        const actions = await tiingo.getCorporateActions(range);
+        print({
+          symbol,
+          security: security
+            ? { fields: Object.keys(security).sort(), listed_at: security.listed_at }
+            : null,
+          bars: {
+            count: bars.length,
+            first: bars[0]?.date ?? null,
+            last: bars.at(-1)?.date ?? null,
+            fields: Object.keys(bars[0] ?? {}).sort(),
+            license_tier: bars[0]?.license_tier ?? null,
+          },
+          corporateActions: {
+            count: actions.length,
+            types: [...new Set(actions.map((a) => a.type))],
+          },
+          httpStatusCounts: Object.fromEntries(tiingo.http.statusCounts),
         });
         break;
       }

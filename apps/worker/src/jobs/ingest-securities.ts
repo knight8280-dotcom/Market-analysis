@@ -27,8 +27,14 @@ export async function ingestSecurities(ctx: WorkerContext, raw: unknown) {
   const counts = emptyCounts();
   const before = statusSnapshot(provider);
   try {
+    // Vendors with a symbol quota (Tiingo) get exactly the configured universe.
+    const symbols =
+      input.symbols ??
+      (ctx.universe && source !== "synthetic"
+        ? ctx.universe.symbols.map((s) => s.symbol)
+        : undefined);
     const records = await withProviderHealth(ctx, { route, source, dataset: "securities" }, () =>
-      provider.getSecurities(input.symbols ? { symbols: input.symbols } : {}),
+      provider.getSecurities(symbols ? { symbols } : {}),
     );
     counts.rows_fetched = records.length;
     for (const record of records) {

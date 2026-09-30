@@ -16,23 +16,38 @@ describe("data licenses", () => {
     }
   });
 
+  const owner = (appEnv: string) => ({ appEnv, viewer: "owner" as const });
+  const pub = (appEnv: string) => ({ appEnv, viewer: "public" as const });
+
   it("never allows synthetic data in production", () => {
-    expect(canDisplay("synthetic", "daily_bars", "local")).toBe(true);
-    expect(canDisplay("synthetic", "daily_bars", "production")).toBe(false);
+    expect(canDisplay("synthetic", "daily_bars", owner("local"))).toBe(true);
+    expect(canDisplay("synthetic", "daily_bars", owner("production"))).toBe(false);
   });
 
-  it("blocks display of uncontracted commercial data", () => {
-    for (const p of ["tiingo", "twelvedata", "massive"] as const) {
+  it("shows personal-plan data to the owner only (ADR-015)", () => {
+    for (const [p, dataset] of [
+      ["tiingo", "daily_bars"],
+      ["finnhub", "earnings"],
+    ] as const) {
+      expect(DATA_LICENSES[p].status).toBe("personal");
+      expect(canDisplay(p, dataset, owner("production"))).toBe(true);
+      expect(canDisplay(p, dataset, pub("production"))).toBe(false);
+    }
+    expect(canDisplay("tiingo", "fundamentals", owner("production"))).toBe(false);
+  });
+
+  it("blocks uncontracted commercial data for everyone", () => {
+    for (const p of ["twelvedata", "massive"] as const) {
       expect(DATA_LICENSES[p].status).toBe("not_contracted");
-      expect(canDisplay(p, "daily_bars", "production")).toBe(false);
-      expect(canDisplay(p, "daily_bars", "local")).toBe(false);
+      expect(canDisplay(p, "daily_bars", owner("production"))).toBe(false);
+      expect(canDisplay(p, "daily_bars", pub("local"))).toBe(false);
     }
   });
 
   it("allows public government data for its datasets only", () => {
-    expect(canDisplay("sec_edgar", "fundamentals", "production")).toBe(true);
-    expect(canDisplay("sec_edgar", "daily_bars", "production")).toBe(false);
-    expect(canDisplay("fred", "macro", "production")).toBe(true);
+    expect(canDisplay("sec_edgar", "fundamentals", pub("production"))).toBe(true);
+    expect(canDisplay("sec_edgar", "daily_bars", pub("production"))).toBe(false);
+    expect(canDisplay("fred", "macro", pub("production"))).toBe(true);
   });
 
   it("carries FRED's required notice verbatim", () => {
@@ -53,7 +68,12 @@ describe("enforceDelay", () => {
   const delayed: DataLicense = {
     ...DATA_LICENSES.tiingo,
     status: "contracted",
-    display: { allowed: true, realtime: false, intradayDelayMinutes: 15, datasets: ["daily_bars"] },
+    display: {
+      audience: "public",
+      realtime: false,
+      intradayDelayMinutes: 15,
+      datasets: ["daily_bars"],
+    },
   };
   const now = new Date("2026-09-29T15:00:00Z");
   const at = (min: number) => ({ as_of: new Date(now.getTime() - min * 60_000), min });

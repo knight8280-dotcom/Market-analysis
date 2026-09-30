@@ -182,7 +182,8 @@ export async function applyShim(client: pg.ClientBase): Promise<void> {
 
 /**
  * A structural fingerprint of our schemas: relations, columns, constraints, indexes, functions,
- * views, policies, triggers and privileges. Used to prove that down → up restores exactly the
+ * views, policies, triggers and privileges. Column positions (attnum) are left out: Postgres keeps
+ * a dropped column's slot, so dropping and re-adding a column moves it without any real change. Used to prove that down → up restores exactly the
  * same schema. Names are schema-qualified because search_path is pinned to pg_catalog.
  */
 export async function schemaFingerprint(
@@ -198,7 +199,7 @@ export async function schemaFingerprint(
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = any($1)`,
     column: `
-      select n.nspname || '.' || c.relname || '.' || a.attname, a.attnum,
+      select n.nspname || '.' || c.relname || '.' || a.attname,
              format_type(a.atttypid, a.atttypmod), a.attnotnull, a.attidentity, a.attgenerated,
              coalesce(pg_get_expr(d.adbin, d.adrelid), '')
       from pg_attribute a

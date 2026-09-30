@@ -120,3 +120,23 @@ export class RedisSlidingWindowLimiter {
 
 /** SEC fair-access policy: 10 requests/second maximum; we target 8. */
 export const SEC_RATE_LIMIT = { key: "ratelimit:sec-edgar", limit: 8, windowMs: 1000 } as const;
+
+/** Takes a slot from every limiter in order (e.g. an hourly and a daily quota). */
+export class CompositeLimiter {
+  constructor(private readonly limiters: readonly { acquire(): Promise<unknown> }[]) {}
+
+  async acquire(): Promise<void> {
+    for (const limiter of this.limiters) await limiter.acquire();
+  }
+}
+
+/**
+ * Tiingo quotas per plan. Free-tier numbers are from the project brief (50 requests/hour,
+ * 1,000/day); override them with TIINGO_HOURLY_LIMIT / TIINGO_DAILY_LIMIT for a paid plan.
+ */
+export function tiingoRateLimits(opts: { hourly?: number; daily?: number } = {}) {
+  return [
+    { key: "ratelimit:tiingo:hour", limit: opts.hourly ?? 50, windowMs: 3_600_000 },
+    { key: "ratelimit:tiingo:day", limit: opts.daily ?? 1_000, windowMs: 86_400_000 },
+  ] as const;
+}

@@ -152,3 +152,12 @@ Nothing blocks starting. Each item has a default.
 - No route serves data without the owner's session.
 
 **Estimated effort:** about 45 small steps, roughly the brief's Phase 1 window minus the dropped public-product work.
+
+## Progress
+
+Approved 2026-09-30 with the defaults (local only, Tiingo free key when provided, 65-symbol universe, SIC sectors, Finnhub and FRED optional, alert email via Resend, no cloud deploy).
+
+| Group | Status                                                                                                                                                                  |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A     | A1, A2, A3, A5 done. A4 (live Tiingo shape check) and the live part of A6 wait for the Tiingo key: `pnpm worker verify-tiingo`, then `pnpm worker bootstrap` (RUNBOOK). |
+| B–K   | not started                                                                                                                                                             |

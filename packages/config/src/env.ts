@@ -22,7 +22,11 @@ export const SECRET_ENV_KEYS = [
   "REDIS_URL",
   "FRED_API_KEY",
   "TIINGO_API_KEY",
+  "FINNHUB_API_KEY",
+  "RESEND_API_KEY",
   "ADMIN_BASIC_AUTH_PASSWORD",
+  "OWNER_PASSWORD",
+  "SESSION_SECRET",
 ] as const;
 
 const booleanFlag = z
@@ -56,6 +60,16 @@ export const workerEnvSchema = z
     DATA_PROVIDER_PRIMARY: z.enum(MARKET_DATA_PROVIDERS),
     DATA_PROVIDER_FALLBACK: z.enum([...MARKET_DATA_PROVIDERS, "none"]).default("none"),
     TIINGO_API_KEY: z.string().min(1).optional(),
+    /** Tiingo quotas; defaults are the free tier's (50/hour, 1,000/day). */
+    TIINGO_HOURLY_LIMIT: z.coerce.number().int().positive().optional(),
+    TIINGO_DAILY_LIMIT: z.coerce.number().int().positive().optional(),
+    /** Symbols to ingest (default: config/universe.json). */
+    UNIVERSE_FILE: z.string().min(1).optional(),
+    FINNHUB_API_KEY: z.string().min(1).optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    /** Where alert emails go: the owner's address (personal use only). */
+    ALERT_EMAIL_TO: z.email().optional(),
+    ALERT_EMAIL_FROM: z.string().min(3).default("Market Analysis <onboarding@resend.dev>"),
   })
   .superRefine((env, ctx) => {
     const providers = [env.DATA_PROVIDER_PRIMARY, env.DATA_PROVIDER_FALLBACK];

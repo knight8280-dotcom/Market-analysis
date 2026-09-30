@@ -174,6 +174,10 @@ export interface MarketSecurities {
   sector: string | null;
   security_id: Generated<Int8>;
   /**
+   * SEC Standard Industrial Classification code from EDGAR submissions.
+   */
+  sic_code: string | null;
+  /**
    * Current (or last) ticker; history lives in security_symbol_history.
    */
   ticker: string;

@@ -144,3 +144,15 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Keep every MUST DO / MUST NOT rule, source and as-of labels, and the SAMPLE DATA banner.
   - Run locally by default. A private cloud deploy is optional and needs Supabase Auth.
 - **Consequences:** if the system is ever shared or published, the licensing work in `DATA_SOURCES.md` and the dropped items come back first. Phase 1 is re-planned in `plans/PHASE_1_PLAN.md`.
+
+## ADR-016: Sectors from SEC SIC codes, not GICS
+
+- **Context:** the heatmap, screener and ticker page group securities by sector. GICS is licensed by MSCI and S&P; Tiingo's free plan reports no sector.
+- **Decision:** take each registrant's SIC code from EDGAR submissions (public domain) and map it to 11 GICS-like groups with `sectorForSic` (`packages/market-data/src/sectors.ts`), first matching range wins. `industry` holds SEC's SIC description. Securities without a CIK (ETFs, funds) keep a null sector.
+- **Consequences:** groups are close to, not equal to, GICS (for example Alphabet and Meta fall under Technology through SIC 7370, where GICS puts them in Communication Services). The UI labels them "Sector (SEC SIC)". A vendor that reports its own sector overwrites it; none of the configured vendors does today.
+
+## ADR-017: A committed universe file, paced by the vendor's quota
+
+- **Context:** Tiingo's free plan allows 500 unique symbols a month and 50 requests an hour, and its meta endpoint does not report the asset class.
+- **Decision:** the worker loads exactly the symbols in `config/universe.json` (65 today: 50 large caps and 15 ETFs), each with its asset class. Tiingo requests pass through hourly and daily Redis sliding windows (ADR-006's limiter, composed); jobs wait for a slot rather than fail. The synthetic provider ignores the file.
+- **Consequences:** adding a symbol is a one-line change plus `pnpm worker bootstrap` (idempotent). A larger universe needs a paid personal plan and the two limit variables.

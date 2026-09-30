@@ -1,5 +1,9 @@
 import type { FundamentalFact } from "@market/market-data";
-import { padCik } from "@market/market-data/adapters/sec-edgar";
+import {
+  padCik,
+  SecEdgarProvider,
+  type TickerMapEntry,
+} from "@market/market-data/adapters/sec-edgar";
 import { marketDateOf } from "@market/calendar";
 import { sql } from "@market/db";
 import { z } from "zod";
@@ -10,6 +14,7 @@ import { JOBS, jobId } from "../queues";
 import { insertFacts, insertFilings } from "../repo/edgar";
 import { recordIssues, type IssueRow } from "../repo/quality";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
+import { applyEdgarEntity, securitiesMissingCik, setCik } from "../repo/securities";
 import { resolveSource, withProviderHealth } from "../routing";
 
 export const CikInput = z.object({ cik: z.string().regex(/^\d{1,10}$/) });
@@ -118,9 +123,16 @@ export async function ingestFilings(ctx: WorkerContext, raw: unknown) {
   const counts = emptyCounts();
   const before = statusSnapshot(provider);
   try {
-    const filings = await withProviderHealth(ctx, { route, source, dataset: "filings" }, () =>
-      provider.getFilings({ cik }),
+    // The submissions payload also carries the registrant's SIC code, used for sectors.
+    const { entity, filings } = await withProviderHealth(
+      ctx,
+      { route, source, dataset: "filings" },
+      async () =>
+        provider instanceof SecEdgarProvider
+          ? provider.getSubmissions({ cik })
+          : { entity: null, filings: await provider.getFilings({ cik }) },
     );
+    if (entity) await applyEdgarEntity(ctx.db, entity, ctx.clock());
     counts.rows_fetched = filings.length;
     const inserted = await insertFilings(ctx.db, filings);
     counts.rows_inserted = inserted.length;
@@ -156,9 +168,72 @@ export async function ingestFilings(ctx: WorkerContext, raw: unknown) {
   }
 }
 
-/** Daily off-peak sweep: refresh filing metadata for every active security with a CIK. */
+/** SEC writes share classes with "-" (BRK-B); vendors also use "." or "/". */
+export function normalizeTicker(ticker: string): string {
+  return ticker.trim().toUpperCase().replace(/[./]/g, "-");
+}
+
+/**
+ * Attaches SEC CIKs to equities that lack one, matched by ticker through SEC's
+ * company_tickers_exchange.json, then queues a filings refresh for each registrant (which also
+ * sets its SIC code, industry and sector). Tickers SEC does not list are reported, not guessed.
+ */
+export async function attachEdgarIds(ctx: WorkerContext) {
+  const date = marketDateOf(ctx.clock());
+  const missing = await securitiesMissingCik(ctx.db);
+  if (missing.length === 0) return { date, candidates: 0, attached: 0, unmatched: [] };
+  const { route, source, provider } = await resolveSource(ctx, "filings");
+  if (!(provider instanceof SecEdgarProvider)) {
+    throw new Error(`attach-edgar-ids needs SEC EDGAR as the filings source, not ${source}`);
+  }
+  const entries = await withProviderHealth(ctx, { route, source, dataset: "filings" }, () =>
+    provider.getTickerMap(),
+  );
+  const byTicker = new Map<string, TickerMapEntry>();
+  for (const e of entries) {
+    const key = normalizeTicker(e.ticker);
+    if (!byTicker.has(key)) byTicker.set(key, e);
+  }
+  const ciks = new Set<string>();
+  const unmatched: string[] = [];
+  for (const s of missing) {
+    const hit = byTicker.get(normalizeTicker(s.ticker));
+    if (!hit) {
+      unmatched.push(s.ticker);
+      continue;
+    }
+    await setCik(ctx.db, s.security_id, hit.cik, ctx.clock());
+    ciks.add(hit.cik);
+  }
+  for (const cik of ciks) {
+    await ctx.dispatch.dispatch({
+      name: JOBS.ingestFilings,
+      data: { cik },
+      jobId: jobId(JOBS.ingestFilings, date, cik),
+    });
+  }
+  if (unmatched.length > 0) ctx.log.warn({ unmatched }, "tickers not in SEC's ticker map");
+  return {
+    date,
+    candidates: missing.length,
+    attached: missing.length - unmatched.length,
+    unmatched,
+  };
+}
+
+/**
+ * Daily off-peak sweep: attach CIKs to new equities, then refresh filing metadata for every
+ * active security with a CIK.
+ */
 export async function scheduleEdgar(ctx: WorkerContext) {
   const date = marketDateOf(ctx.clock());
+  if ((await securitiesMissingCik(ctx.db)).length > 0) {
+    await ctx.dispatch.dispatch({
+      name: JOBS.attachEdgarIds,
+      data: {},
+      jobId: jobId(JOBS.attachEdgarIds, date),
+    });
+  }
   const rows = await sql<{ cik: string }>`
     select distinct cik from market.securities where cik is not null and is_active order by cik
   `.execute(ctx.db);

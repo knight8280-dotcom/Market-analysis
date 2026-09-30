@@ -10,6 +10,7 @@ import type {
 } from "@market/market-data";
 import type { Logger } from "./log";
 import type { JobName } from "./queues";
+import type { Universe } from "./universe";
 
 export type WorkerEvent =
   | RoutingEvent
@@ -48,6 +49,8 @@ export interface WorkerContext {
   dispatch: Dispatcher;
   /** Id of the job being run, for ingestion run records. */
   jobId?: string;
+  /** Configured symbols for quota-limited vendors (config/universe.json). */
+  universe?: Universe;
 }
 
 export type DatasetKey = Dataset;

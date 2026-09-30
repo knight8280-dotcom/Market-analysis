@@ -1,11 +1,17 @@
 import type { Dataset, LicenseTier, ProviderId } from "./types";
 
 /**
- * The `data_licenses` config (spec §2.2): what the site may do with each provider's data.
+ * The `data_licenses` config (spec §2.2): what the system may do with each provider's data.
  * docs/DATA_SOURCES.md records the plan, terms URL and verification date for each entry; the
- * two must be updated together. A commercial provider may only display data once its contract
- * is signed and this entry is changed to `contracted`.
+ * two must be updated together.
+ *
+ * Audiences: "none" (not displayable), "owner" (a personal plan: the owner's own screen only,
+ * ADR-015), "public" (anyone). Showing a personal plan's data to anyone else needs a display
+ * contract first.
  */
+
+export type DisplayAudience = "none" | "owner" | "public";
+export type Viewer = "owner" | "public";
 
 export interface Attribution {
   provider: ProviderId;
@@ -16,12 +22,12 @@ export interface Attribution {
 export interface DataLicense {
   provider: ProviderId;
   plan: string;
-  status: "synthetic" | "public" | "contracted" | "not_contracted";
+  status: "synthetic" | "public" | "personal" | "contracted" | "not_contracted";
   /** Stamped on every record fetched from this provider. */
   licenseTier: LicenseTier;
   display: {
-    /** May anyone other than the developer see this data? */
-    allowed: boolean;
+    /** Who may see this data. */
+    audience: DisplayAudience;
     realtime: boolean;
     /** Minimum delay for intraday display to non-entitled users; null = no intraday display. */
     intradayDelayMinutes: number | null;
@@ -40,7 +46,7 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     status: "synthetic",
     licenseTier: "synthetic",
     display: {
-      allowed: true,
+      audience: "public",
       realtime: false,
       intradayDelayMinutes: null,
       datasets: ["securities", "daily_bars", "corporate_actions"],
@@ -52,10 +58,15 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
   },
   tiingo: {
     provider: "tiingo",
-    plan: "Personal key (development only). Display requires EOD + IEX display redistribution.",
-    status: "not_contracted",
+    plan: "Personal plan (free tier or Power): the owner's own use only. Showing it to anyone else needs EOD + IEX display redistribution.",
+    status: "personal",
     licenseTier: "personal_dev",
-    display: { allowed: false, realtime: false, intradayDelayMinutes: null, datasets: [] },
+    display: {
+      audience: "owner",
+      realtime: false,
+      intradayDelayMinutes: null,
+      datasets: ["securities", "daily_bars", "corporate_actions"],
+    },
     exportAllowed: false,
     attribution: {
       provider: "tiingo",
@@ -70,7 +81,7 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     plan: "Not contracted. Display requires a Business plan (Venture or above).",
     status: "not_contracted",
     licenseTier: "personal_dev",
-    display: { allowed: false, realtime: false, intradayDelayMinutes: null, datasets: [] },
+    display: { audience: "none", realtime: false, intradayDelayMinutes: null, datasets: [] },
     exportAllowed: false,
     attribution: {
       provider: "twelvedata",
@@ -85,7 +96,7 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     plan: "Not contracted. Display requires Stocks Business.",
     status: "not_contracted",
     licenseTier: "personal_dev",
-    display: { allowed: false, realtime: false, intradayDelayMinutes: null, datasets: [] },
+    display: { audience: "none", realtime: false, intradayDelayMinutes: null, datasets: [] },
     exportAllowed: false,
     attribution: {
       provider: "massive",
@@ -101,7 +112,7 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     status: "public",
     licenseTier: "public_domain",
     display: {
-      allowed: true,
+      audience: "public",
       realtime: false,
       intradayDelayMinutes: null,
       datasets: ["fundamentals", "filings"],
@@ -120,7 +131,12 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     plan: "FRED API (free key). Only series without third-party copyright notes.",
     status: "public",
     licenseTier: "public_domain",
-    display: { allowed: true, realtime: false, intradayDelayMinutes: null, datasets: ["macro"] },
+    display: {
+      audience: "public",
+      realtime: false,
+      intradayDelayMinutes: null,
+      datasets: ["macro"],
+    },
     exportAllowed: false,
     attribution: {
       provider: "fred",
@@ -131,12 +147,33 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     termsUrl: "https://fred.stlouisfed.org/docs/api/terms_of_use.html",
     verifiedOn: "2026-09-30",
   },
+  finnhub: {
+    provider: "finnhub",
+    plan: "Free personal key: the owner's own use only. Commercial use needs Finnhub's written approval.",
+    status: "personal",
+    licenseTier: "personal_dev",
+    display: {
+      audience: "owner",
+      realtime: false,
+      intradayDelayMinutes: null,
+      datasets: ["earnings"],
+    },
+    exportAllowed: false,
+    attribution: { provider: "finnhub", text: "Earnings data: Finnhub", url: "https://finnhub.io" },
+    termsUrl: "https://finnhub.io/terms-of-service",
+    verifiedOn: null,
+  },
   treasury: {
     provider: "treasury",
     plan: "Public Treasury yield curve data",
     status: "public",
     licenseTier: "public_domain",
-    display: { allowed: true, realtime: false, intradayDelayMinutes: null, datasets: ["macro"] },
+    display: {
+      audience: "public",
+      realtime: false,
+      intradayDelayMinutes: null,
+      datasets: ["macro"],
+    },
     exportAllowed: true,
     attribution: { provider: "treasury", text: "Source: U.S. Department of the Treasury" },
     termsUrl: null,
@@ -149,13 +186,20 @@ export function licenseFor(provider: ProviderId): DataLicense {
 }
 
 /**
- * May this provider's data for `dataset` be shown to users in `appEnv`? Synthetic data is never
- * displayable in production (MUST-NOT #2); commercial data only once contracted.
+ * May this provider's data for `dataset` be shown to `viewer` in `appEnv`? Synthetic data is
+ * never displayable in production (MUST-NOT #2); personal-plan data only to the owner;
+ * uncontracted commercial data to nobody.
  */
-export function canDisplay(provider: ProviderId, dataset: Dataset, appEnv: string): boolean {
+export function canDisplay(
+  provider: ProviderId,
+  dataset: Dataset,
+  ctx: { appEnv: string; viewer: Viewer },
+): boolean {
   const license = licenseFor(provider);
-  if (license.status === "synthetic") return appEnv !== "production";
-  return license.display.allowed && license.display.datasets.includes(dataset);
+  if (!license.display.datasets.includes(dataset)) return false;
+  if (license.status === "synthetic") return ctx.appEnv !== "production";
+  const audience = license.display.audience;
+  return audience === "public" || (audience === "owner" && ctx.viewer === "owner");
 }
 
 /**
@@ -170,7 +214,7 @@ export function enforceDelay<T extends { as_of: Date }>(
   const { license } = opts;
   if (license.display.realtime && opts.entitledRealtime) return [...records];
   const delay = license.display.intradayDelayMinutes;
-  if (!license.display.allowed || delay === null) return [];
+  if (license.display.audience === "none" || delay === null) return [];
   const cutoff = opts.now.getTime() - delay * 60_000;
   return records.filter((r) => r.as_of.getTime() <= cutoff);
 }

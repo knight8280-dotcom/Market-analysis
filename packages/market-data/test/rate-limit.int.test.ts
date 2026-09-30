@@ -3,7 +3,11 @@ import { Redis } from "ioredis";
 import { afterAll, describe, expect, it } from "vitest";
 import { RateLimiterUnavailableError } from "../src/errors";
 import { HttpClient } from "../src/http";
-import { RedisSlidingWindowLimiter } from "../src/rate-limit/sliding-window";
+import {
+  CompositeLimiter,
+  RedisSlidingWindowLimiter,
+  tiingoRateLimits,
+} from "../src/rate-limit/sliding-window";
 import { json, startServer } from "./helpers/server";
 
 const redisUrl = process.env.TEST_REDIS_URL ?? "redis://localhost:6379";
@@ -83,5 +87,40 @@ describe("RedisSlidingWindowLimiter", () => {
     } finally {
       await server.close();
     }
+  });
+});
+
+describe("Tiingo quotas (hourly and daily windows together)", () => {
+  function quota(redis: Redis, opts: { hourly: number; daily: number }) {
+    const run = randomUUID();
+    return new CompositeLimiter(
+      tiingoRateLimits(opts).map(
+        (l) =>
+          new RedisSlidingWindowLimiter(redis, { ...l, key: `test:${l.key}:${run}`, maxWaitMs: 0 }),
+      ),
+    );
+  }
+
+  it("defaults to the free tier: 50 an hour, 1,000 a day", () => {
+    expect(tiingoRateLimits().map((l) => [l.limit, l.windowMs])).toEqual([
+      [50, 3_600_000],
+      [1_000, 86_400_000],
+    ]);
+  });
+
+  it("refuses the request after the hourly quota", async () => {
+    const redis = connect();
+    await ready(redis);
+    const limiter = quota(redis, { hourly: 3, daily: 10 });
+    for (let i = 0; i < 3; i += 1) await limiter.acquire();
+    await expect(limiter.acquire()).rejects.toThrow(/tiingo:hour.*no slot/);
+  });
+
+  it("refuses the request after the daily quota even with hourly room left", async () => {
+    const redis = connect();
+    await ready(redis);
+    const limiter = quota(redis, { hourly: 10, daily: 2 });
+    for (let i = 0; i < 2; i += 1) await limiter.acquire();
+    await expect(limiter.acquire()).rejects.toThrow(/tiingo:day.*no slot/);
   });
 });

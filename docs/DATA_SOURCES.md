@@ -11,40 +11,38 @@ Research behind these rows: `docs/BRIEF.md`.
 
 ## Summary
 
-| Provider                   | Status                                               | License tier    | Display                                         | Datasets                                  | Verified   | Terms                                                                           |
-| -------------------------- | ---------------------------------------------------- | --------------- | ----------------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
-| Synthetic (`synthetic`)    | generated test data                                  | `synthetic`     | non-production only, with SAMPLE DATA banner    | securities, daily bars, corporate actions | n/a        | n/a                                                                             |
-| Tiingo (`tiingo`)          | **personal plan, owner only** (key not yet provided) | `personal_dev`  | owner only; code change in Phase 1 step A1      | daily bars, corporate actions, securities | —          | https://www.tiingo.com/about/pricing                                            |
-| Twelve Data (`twelvedata`) | not contracted, no adapter yet                       | `personal_dev`  | no                                              | —                                         | —          | https://twelvedata.com/pricing-business                                         |
-| Massive (`massive`)        | not contracted, no adapter yet                       | `personal_dev`  | no                                              | —                                         | —          | https://massive.com/business-stocks                                             |
-| SEC EDGAR (`sec_edgar`)    | public                                               | `public_domain` | yes                                             | fundamentals, filings                     | 2026-09-30 | https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data |
-| FRED (`fred`)              | public API (free key)                                | `public_domain` | yes (series without third-party copyright only) | macro                                     | 2026-09-30 | https://fred.stlouisfed.org/docs/api/terms_of_use.html                          |
-| U.S. Treasury (`treasury`) | public, no adapter yet                               | `public_domain` | yes                                             | macro                                     | —          | —                                                                               |
+| Provider                   | Status                                                  | License tier    | Display                                         | Datasets                                  | Verified   | Terms                                                                           |
+| -------------------------- | ------------------------------------------------------- | --------------- | ----------------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
+| Synthetic (`synthetic`)    | generated test data                                     | `synthetic`     | non-production only, with SAMPLE DATA banner    | securities, daily bars, corporate actions | n/a        | n/a                                                                             |
+| Tiingo (`tiingo`)          | **personal plan, owner only** (key not yet provided)    | `personal_dev`  | owner only (`DATA_LICENSES` audience `owner`)   | daily bars, corporate actions, securities | —          | https://www.tiingo.com/about/pricing                                            |
+| Finnhub (`finnhub`)        | **personal plan, owner only**; optional, no adapter yet | `personal_dev`  | owner only                                      | earnings calendar (Phase 1 H1)            | —          | https://finnhub.io/pricing                                                      |
+| Twelve Data (`twelvedata`) | not contracted, no adapter yet                          | `personal_dev`  | no                                              | —                                         | —          | https://twelvedata.com/pricing-business                                         |
+| Massive (`massive`)        | not contracted, no adapter yet                          | `personal_dev`  | no                                              | —                                         | —          | https://massive.com/business-stocks                                             |
+| SEC EDGAR (`sec_edgar`)    | public                                                  | `public_domain` | yes                                             | fundamentals, filings                     | 2026-09-30 | https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data |
+| FRED (`fred`)              | public API (free key)                                   | `public_domain` | yes (series without third-party copyright only) | macro                                     | 2026-09-30 | https://fred.stlouisfed.org/docs/api/terms_of_use.html                          |
+| U.S. Treasury (`treasury`) | public, no adapter yet                                  | `public_domain` | yes                                             | macro                                     | —          | —                                                                               |
 
 ## Provider notes
 
-### Tiingo (planned primary)
+### Tiingo (primary for prices)
 
-- **Plan to buy:** EOD + IEX display redistribution ($250/month startup) and, optionally, fundamentals display redistribution ($200/month startup). Personal plans (Power, Commercial) are internal-use only.
-- **Before contracting,** get written answers to:
-  - Are SEO-indexed public pages allowed?
-  - Is CSV export allowed?
-  - What attribution text or logo is required?
-  - What caching and storage terms apply?
-  - What delay applies to IEX data?
+- **Plan:** the free personal plan (ADR-015). Quotas used by the limiter, from the project brief: 50 requests/hour, 1,000/day, 500 unique symbols/month. Confirm them on the pricing page when the key is created, and set `TIINGO_HOURLY_LIMIT`/`TIINGO_DAILY_LIMIT` for a paid personal plan (Power).
+- **Pacing:** both quotas are sliding windows in Redis (`ratelimit:tiingo:hour`, `ratelimit:tiingo:day`), shared by the worker and the CLI. A job waits up to 65 minutes for a slot instead of failing. One symbol costs two requests on first load (meta + prices; bars and corporate actions share the prices request), so a 65-symbol bootstrap takes about 2 hours 40 minutes on the free tier.
+- **Display redistribution** (needed only if the system is ever shared): EOD + IEX redistribution ($250/month startup) and, optionally, fundamentals ($200/month startup). The questions to ask Tiingo before that are in `docs/BRIEF.md`.
 - **Adapter status: SHAPE UNVERIFIED.**
   - The price fields (`date, open, high, low, close, volume, adjOpen…adjVolume, divCash, splitFactor`) and meta fields (`ticker, name, exchangeCode, description, startDate, endDate`) come from Tiingo's public documentation, checked 2026-09-30.
   - The `Authorization: Token <key>` header is not shown on the public page and is unverified.
   - The fixtures (`packages/market-data/test/fixtures/tiingo`) hold synthetic values.
   - To verify: make one request per endpoint with a personal key, compare field names and types with the fixtures, and record the result and date here. **Do not commit the response.**
-- **Asset class:** the meta endpoint does not report it, so `TiingoProvider` refuses securities whose asset class is not configured. Phase 1 adds a universe file, or the `supported_tickers` list, which carries `assetType`.
+- **Asset class:** the meta endpoint does not report it, so `TiingoProvider` refuses securities whose asset class is not configured. The universe file (`config/universe.json`, ADR-017) supplies it for every symbol the worker loads.
 
 ### SEC EDGAR
 
+- **CIKs for securities:** `attach-edgar-ids` matches equities without a CIK to `company_tickers_exchange.json` by ticker (`BRK.B` = `BRK-B`). Synthetic securities never get one. Unmatched tickers are logged, not guessed.
 - **Fair-access policy** (≤ 10 requests/second, declared User-Agent in the form `Sample Company Name AdminContact@<domain>.com`). We run at ≤ 8 requests/second across all processes through the Redis limiter, and retry 403/429/503 with backoff.
 - **Endpoints used:**
   - `https://www.sec.gov/files/company_tickers_exchange.json`
-  - `https://data.sec.gov/submissions/CIK##########.json` (recent filings only; older pages and `submissions.zip` are the Phase 1 bulk path)
+  - `https://data.sec.gov/submissions/CIK##########.json` (recent filings only; older pages and `submissions.zip` are the Phase 1 bulk path). The same response gives the registrant's SIC code, which sets `sic_code`, `industry` and `sector` (ADR-016).
   - `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
 - **Fixtures:**
   - hand-built cases with made-up values (registrant CIK 0000000042);

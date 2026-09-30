@@ -37,7 +37,7 @@ jobs:
   integration:
     name: Migrations and integration tests (Postgres 17, Redis 7)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17
@@ -69,6 +69,8 @@ jobs:
       - name: Generated DB types match migrations
         run: pnpm db:codegen:check
       - run: pnpm test:int
+      - name: Phase 0 acceptance (500 tickers x 10 years, ingested twice)
+        run: pnpm test:acceptance
 
   security:
     name: Secret scan, dependency audit, licenses

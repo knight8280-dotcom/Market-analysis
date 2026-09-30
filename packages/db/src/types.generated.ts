@@ -260,6 +260,7 @@ export interface OpsDatasetRouting {
 
 export interface OpsProviderHealth {
   consecutive_failures: Generated<number>;
+  consecutive_successes: Generated<number>;
   dataset: string;
   failures_total: Generated<Int8>;
   last_error: string | null;

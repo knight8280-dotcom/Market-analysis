@@ -67,6 +67,8 @@ create table ops.provider_health (
   last_failure_at timestamptz,
   last_error text,
   consecutive_failures integer not null default 0,
+  -- Counts successful requests and failback probes since the last failure.
+  consecutive_successes integer not null default 0,
   last_latency_ms integer,
   requests_total bigint not null default 0,
   failures_total bigint not null default 0,

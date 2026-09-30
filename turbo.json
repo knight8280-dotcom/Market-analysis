@@ -17,6 +17,10 @@
     "test:int": {
       "cache": false,
       "env": ["TEST_DATABASE_URL", "TEST_REDIS_URL"]
+    },
+    "test:acceptance": {
+      "cache": false,
+      "env": ["TEST_DATABASE_URL", "TEST_REDIS_URL"]
     }
   }
 }

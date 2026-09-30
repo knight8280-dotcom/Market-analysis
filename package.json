@@ -22,7 +22,8 @@
     "db:codegen": "pnpm --filter @market/db run codegen",
     "db:codegen:check": "pnpm --filter @market/db run codegen:check",
     "licenses:check": "node scripts/check-licenses.mjs",
-    "worker": "pnpm --filter @market/worker run cli"
+    "worker": "pnpm --filter @market/worker run cli",
+    "test:acceptance": "turbo run test:acceptance --concurrency=1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

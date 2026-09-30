@@ -1,0 +1,9 @@
+# Local pre-commit checks. CI runs the same scans and is authoritative.
+pre-commit:
+  parallel: true
+  commands:
+    secrets:
+      run: scripts/precommit-secrets.sh
+    format:
+      glob: "*.{ts,tsx,mjs,js,json,md,yml,yaml}"
+      run: pnpm exec prettier --check {staged_files}

@@ -1,0 +1,7 @@
+# Default gitleaks rules plus an allowlist for the committed placeholder file.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder values only"
+paths = ['''\.env\.example$''']

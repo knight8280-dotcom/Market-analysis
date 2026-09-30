@@ -1,0 +1,171 @@
+import { z } from "zod";
+
+/**
+ * Typed, validated environment configuration (spec §0 rule 5).
+ *
+ * Every process reads secrets only through `loadWorkerEnv` / `loadWebEnv`. Validation errors name
+ * the offending variable but never echo its value.
+ */
+
+export const APP_ENVS = ["local", "test", "preview", "staging", "production"] as const;
+export type AppEnv = (typeof APP_ENVS)[number];
+
+export const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
+
+/** Market-data providers the worker can route prices to in Phase 0. */
+export const MARKET_DATA_PROVIDERS = ["tiingo", "synthetic"] as const;
+export type MarketDataProviderName = (typeof MARKET_DATA_PROVIDERS)[number];
+
+/** Variables whose values must never appear in logs, errors or client bundles. */
+export const SECRET_ENV_KEYS = [
+  "DATABASE_URL",
+  "REDIS_URL",
+  "FRED_API_KEY",
+  "TIINGO_API_KEY",
+  "ADMIN_BASIC_AUTH_PASSWORD",
+] as const;
+
+const booleanFlag = z
+  .enum(["true", "false", "1", "0"], { error: 'must be "true", "false", "1" or "0"' })
+  .transform((v) => v === "true" || v === "1");
+
+const postgresUrl = z
+  .string()
+  .refine((v) => /^postgres(ql)?:\/\/.+/.test(v), "must be a postgres:// or postgresql:// URL");
+
+const redisUrl = z
+  .string()
+  .refine((v) => /^rediss?:\/\/.+/.test(v), "must be a redis:// or rediss:// URL");
+
+const baseShape = {
+  APP_ENV: z.enum(APP_ENVS),
+  LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
+  DATABASE_URL: postgresUrl,
+};
+
+export const workerEnvSchema = z
+  .object({
+    ...baseShape,
+    REDIS_URL: redisUrl,
+    /** Brand name used in the SEC User-Agent (`[BRAND_NAME] admin@[DOMAIN]`). */
+    APP_NAME: z.string().trim().min(1).optional(),
+    SEC_CONTACT_EMAIL: z.email().optional(),
+    EDGAR_ENABLED: booleanFlag.default(false),
+    FRED_API_KEY: z.string().min(1).optional(),
+    FRED_ENABLED: booleanFlag.default(false),
+    DATA_PROVIDER_PRIMARY: z.enum(MARKET_DATA_PROVIDERS),
+    DATA_PROVIDER_FALLBACK: z.enum([...MARKET_DATA_PROVIDERS, "none"]).default("none"),
+    TIINGO_API_KEY: z.string().min(1).optional(),
+  })
+  .superRefine((env, ctx) => {
+    const providers = [env.DATA_PROVIDER_PRIMARY, env.DATA_PROVIDER_FALLBACK];
+
+    // MUST-NOT #2: sample data must never be able to pass for real data in production.
+    if (env.APP_ENV === "production" && providers.includes("synthetic")) {
+      ctx.addIssue({
+        code: "custom",
+        path: [
+          env.DATA_PROVIDER_PRIMARY === "synthetic"
+            ? "DATA_PROVIDER_PRIMARY"
+            : "DATA_PROVIDER_FALLBACK",
+        ],
+        message: "the synthetic provider is not allowed when APP_ENV=production",
+      });
+    }
+    if (env.DATA_PROVIDER_FALLBACK === env.DATA_PROVIDER_PRIMARY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DATA_PROVIDER_FALLBACK"],
+        message: "must differ from DATA_PROVIDER_PRIMARY",
+      });
+    }
+    if (providers.includes("tiingo") && !env.TIINGO_API_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["TIINGO_API_KEY"],
+        message: "is required when tiingo is the primary or fallback provider",
+      });
+    }
+    // SEC fair-access policy requires a declared User-Agent with a real contact.
+    if (env.EDGAR_ENABLED && (!env.APP_NAME || !env.SEC_CONTACT_EMAIL)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [!env.APP_NAME ? "APP_NAME" : "SEC_CONTACT_EMAIL"],
+        message: "APP_NAME and SEC_CONTACT_EMAIL are required when EDGAR_ENABLED=true",
+      });
+    }
+    if (env.FRED_ENABLED && !env.FRED_API_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["FRED_API_KEY"],
+        message: "is required when FRED_ENABLED=true",
+      });
+    }
+  });
+
+export type WorkerEnv = z.infer<typeof workerEnvSchema>;
+
+export const webEnvSchema = z.object({
+  ...baseShape,
+  ADMIN_BASIC_AUTH_USER: z.string().min(1),
+  ADMIN_BASIC_AUTH_PASSWORD: z.string().min(16, "must be at least 16 characters"),
+});
+
+export type WebEnv = z.infer<typeof webEnvSchema>;
+
+export class EnvValidationError extends Error {
+  readonly problems: readonly string[];
+
+  constructor(problems: string[]) {
+    super(`Invalid environment configuration:\n  - ${problems.join("\n  - ")}`);
+    this.name = "EnvValidationError";
+    this.problems = problems;
+  }
+}
+
+type EnvSource = Record<string, string | undefined>;
+
+/** Blank values (`FOO=` in a .env file) count as unset. */
+function normalize(source: EnvSource): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (value !== undefined && value.trim() !== "") out[key] = value;
+  }
+  return out;
+}
+
+function loadEnv<S extends z.ZodType>(schema: S, source: EnvSource): z.infer<S> {
+  const normalized = normalize(source);
+  const result = schema.safeParse(normalized);
+  if (result.success) return result.data;
+  const problems = result.error.issues.map((issue) => {
+    const key = issue.path.map(String).join(".") || "(root)";
+    const missing = issue.code !== "custom" && normalized[key] === undefined;
+    const message = missing ? "is required" : issue.message;
+    return redactSecrets(`${key} ${message}`, normalized);
+  });
+  throw new EnvValidationError(problems);
+}
+
+export function loadWorkerEnv(source: EnvSource = process.env): WorkerEnv {
+  return loadEnv(workerEnvSchema, source);
+}
+
+export function loadWebEnv(source: EnvSource = process.env): WebEnv {
+  return loadEnv(webEnvSchema, source);
+}
+
+/** Replaces any secret env value found in `text` with `[REDACTED:<KEY>]`. */
+export function redactSecrets(text: string, source: EnvSource = process.env): string {
+  let out = text;
+  for (const key of SECRET_ENV_KEYS) {
+    const value = source[key];
+    // Very short values would redact innocent substrings; real secrets are longer.
+    if (value && value.length >= 6) out = out.split(value).join(`[REDACTED:${key}]`);
+  }
+  return out;
+}
+
+export function isProduction(appEnv: AppEnv): boolean {
+  return appEnv === "production";
+}

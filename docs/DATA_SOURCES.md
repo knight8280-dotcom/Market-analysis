@@ -2,19 +2,24 @@
 
 For each provider: plan, license type, what we may do with the data, the date terms were last verified, and the terms URL (spec §2.2). The machine-readable counterpart is `DATA_LICENSES` in `packages/market-data/src/licenses.ts`; update both together.
 
-**Nothing from a commercial provider may be shown to anyone other than the developer until its row says `contracted`.** That includes testers and internal staging users (Massive states this explicitly; the others' personal plans are the same in substance). Research behind these rows: `docs/BRIEF.md`.
+**Personal use only (owner decision, 2026-09-30).** Nothing from this system is shown to anyone other than the owner, so personal data plans are sufficient and no display contract is needed. Two rules follow:
+
+- personal-plan data must never reach a public URL or another person's screen, including testers;
+- if the system is ever shared or published, every commercial row below needs a display/redistribution license first (Massive states this explicitly; the other vendors' personal plans are the same in substance).
+
+Research behind these rows: `docs/BRIEF.md`.
 
 ## Summary
 
-| Provider                   | Status                                                 | License tier    | Display                                         | Datasets                                  | Verified   | Terms                                                                           |
-| -------------------------- | ------------------------------------------------------ | --------------- | ----------------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
-| Synthetic (`synthetic`)    | generated test data                                    | `synthetic`     | non-production only, with SAMPLE DATA banner    | securities, daily bars, corporate actions | n/a        | n/a                                                                             |
-| Tiingo (`tiingo`)          | **not contracted** (personal key for development only) | `personal_dev`  | **no**                                          | —                                         | —          | https://www.tiingo.com/about/pricing                                            |
-| Twelve Data (`twelvedata`) | not contracted, no adapter yet                         | `personal_dev`  | no                                              | —                                         | —          | https://twelvedata.com/pricing-business                                         |
-| Massive (`massive`)        | not contracted, no adapter yet                         | `personal_dev`  | no                                              | —                                         | —          | https://massive.com/business-stocks                                             |
-| SEC EDGAR (`sec_edgar`)    | public                                                 | `public_domain` | yes                                             | fundamentals, filings                     | 2026-09-30 | https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data |
-| FRED (`fred`)              | public API (free key)                                  | `public_domain` | yes (series without third-party copyright only) | macro                                     | 2026-09-30 | https://fred.stlouisfed.org/docs/api/terms_of_use.html                          |
-| U.S. Treasury (`treasury`) | public, no adapter yet                                 | `public_domain` | yes                                             | macro                                     | —          | —                                                                               |
+| Provider                   | Status                                               | License tier    | Display                                         | Datasets                                  | Verified   | Terms                                                                           |
+| -------------------------- | ---------------------------------------------------- | --------------- | ----------------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
+| Synthetic (`synthetic`)    | generated test data                                  | `synthetic`     | non-production only, with SAMPLE DATA banner    | securities, daily bars, corporate actions | n/a        | n/a                                                                             |
+| Tiingo (`tiingo`)          | **personal plan, owner only** (key not yet provided) | `personal_dev`  | owner only; code change in Phase 1 step A1      | daily bars, corporate actions, securities | —          | https://www.tiingo.com/about/pricing                                            |
+| Twelve Data (`twelvedata`) | not contracted, no adapter yet                       | `personal_dev`  | no                                              | —                                         | —          | https://twelvedata.com/pricing-business                                         |
+| Massive (`massive`)        | not contracted, no adapter yet                       | `personal_dev`  | no                                              | —                                         | —          | https://massive.com/business-stocks                                             |
+| SEC EDGAR (`sec_edgar`)    | public                                               | `public_domain` | yes                                             | fundamentals, filings                     | 2026-09-30 | https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data |
+| FRED (`fred`)              | public API (free key)                                | `public_domain` | yes (series without third-party copyright only) | macro                                     | 2026-09-30 | https://fred.stlouisfed.org/docs/api/terms_of_use.html                          |
+| U.S. Treasury (`treasury`) | public, no adapter yet                               | `public_domain` | yes                                             | macro                                     | —          | —                                                                               |
 
 ## Provider notes
 
@@ -41,9 +46,12 @@ For each provider: plan, license type, what we may do with the data, the date te
   - `https://www.sec.gov/files/company_tickers_exchange.json`
   - `https://data.sec.gov/submissions/CIK##########.json` (recent filings only; older pages and `submissions.zip` are the Phase 1 bulk path)
   - `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
-- **Fixtures are hand-built, not recordings.** A recording needs our real User-Agent contact. Registrant CIK 0000000042 and all values are made up. Re-record trimmed live responses on the first live run.
-- **Unverified assumption:** `acceptanceDateTime` (e.g. `2025-08-01T06:01:36.000Z`) appears to be Eastern wall-clock time despite the `Z`. We read it as Eastern, which makes a filing public 4–5 hours later than the UTC reading. That is the safe direction for point-in-time use, because it can never create look-ahead. Confirm on the first live run by comparing with the filing index page's "Accepted" time.
-- **Live acceptance run** ("companyfacts for 50 companies without a single 403/429") is **pending** a real brand name and contact email. Procedure: `RUNBOOK.md` → "EDGAR live run".
+- **Fixtures:**
+  - hand-built cases with made-up values (registrant CIK 0000000042);
+  - trimmed **live recordings** from 2026-09-30 (`test/fixtures/sec-edgar/recorded/`): Apple submissions and companyfacts, a numeric-string CIK (ExxonMobil Holdings Corp) and `fy: 0`/`fp: ""` facts (Wells Fargo). SEC data is public domain, so recordings may be committed.
+- **Response shape verified 2026-09-30** on the live run.
+- **`acceptanceDateTime` is true UTC** (verified 2026-09-30). Apple's FY2025 10-K shows `2025-10-31T10:01:26.000Z` in the JSON and "Accepted 2025-10-31 06:01:26" (Eastern) on its index page.
+- **Live acceptance run done 2026-09-30:** 50 companies, 101 requests, all HTTP 200, 1,461,821 facts and 119,717 filings. The User-Agent is `Market Analysis <owner email>`; the email is set only in env and never committed.
 
 ### FRED
 

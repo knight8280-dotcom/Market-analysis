@@ -3,7 +3,7 @@
 This file is the project's standing specification: Part B ("Master Build Prompt") of the original build brief, reproduced verbatim below. Phase instructions arrive separately. **Phase instructions govern scope; this document governs rules.**
 
 - Full original brief (licensing research, variables, phase prompts, checklists, provider comparison, risk register, sources): [`docs/BRIEF.md`](docs/BRIEF.md)
-- Current phase: **Phase 0 complete (2026-09-30).** Report: [`docs/plans/PHASE_0_REPORT.md`](docs/plans/PHASE_0_REPORT.md). The Phase 1 plan draft at the end of that report is waiting for approval.
+- Current phase: **Phase 0 complete (2026-09-30), 5/5 acceptance criteria met.** Report: [`docs/plans/PHASE_0_REPORT.md`](docs/plans/PHASE_0_REPORT.md). **Phase 1 plan (personal use) is waiting for approval:** [`docs/plans/PHASE_1_PLAN.md`](docs/plans/PHASE_1_PLAN.md).
 - Project docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md), [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/RUNBOOK.md`](docs/RUNBOOK.md), [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 
 ## Resolved variables (Part A)
@@ -12,24 +12,27 @@ Placeholders in the spec below resolve to these values. Update this table when a
 
 | Variable | Current value | Status |
 |---|---|---|
-| [BRAND_NAME] | — | **Open.** Needed for the SEC User-Agent. |
-| [DOMAIN] | — | **Open.** Needed for the SEC User-Agent, email and SEO. |
-| [TARGET_USER] | Self-directed retail investors and serious hobbyist traders (non-professional) | Default |
+| [BRAND_NAME] | Market Analysis | Decided 2026-09-30 |
+| [DOMAIN] | none: personal use, not deployed publicly | Decided 2026-09-30 |
+| SEC contact | the owner's email, set only in env (`SEC_CONTACT_EMAIL`), never committed | Decided 2026-09-30 |
+| [TARGET_USER] | **the owner only (personal use)** | Decided 2026-09-30; see scope note |
 | [MARKETS] | US equities + ETFs; options later; crypto/FX/futures out of scope but not precluded | Default |
-| [DATA_PROVIDER_PRIMARY] | Tiingo EOD+IEX redistribution + Tiingo fundamentals redistribution (proposed) | **Open.** No contract yet. |
-| [DATA_PROVIDER_FALLBACK] | Twelve Data Business Venture (proposed); Massive Stocks Business at growth stage | **Open** |
-| [FUNDAMENTALS_SOURCE] | SEC EDGAR XBRL (free) + provider fundamentals | Default |
+| [DATA_PROVIDER_PRIMARY] | Tiingo personal plan (free tier; Power if full-market data is wanted) | Personal use only |
+| [DATA_PROVIDER_FALLBACK] | none in production; synthetic in development | Default |
+| [FUNDAMENTALS_SOURCE] | SEC EDGAR XBRL (free) | Default |
 | [MACRO_SOURCE] | FRED + US Treasury (free) | Default |
-| [DATA_LATENCY_MODE] | 15-minute delayed intraday + end-of-day (MVP); real-time later | Default |
-| [STACK] | TypeScript, Next.js (App Router), Postgres on Supabase, Redis, separate Node worker, SSE, Vercel + worker host | Default |
+| [DATA_LATENCY_MODE] | end-of-day (delayed intraday later if wanted) | Default |
+| [STACK] | TypeScript, Next.js (App Router), Postgres, Redis, Node worker; runs locally (Docker Compose) unless a private cloud deploy is chosen | Default |
 | [CHART_LIB] | TradingView Lightweight Charts (Apache-2.0, attribution required) | Default |
-| [AUTH] | Supabase Auth (email magic link, Google, Apple; TOTP MFA) | Default |
-| [BILLING] | Stripe Billing | Default |
-| [EMAIL_PROVIDER] | Resend / Postmark / SES | Open (Phase 1) |
+| [AUTH] | single-owner access; Supabase Auth only if deployed to the cloud | Phase 1 plan |
+| [BILLING] | none (personal use) | Decided 2026-09-30 |
+| [EMAIL_PROVIDER] | Resend, alerts to the owner only | Phase 1 plan |
 | [LLM_PROVIDER] | Any frontier LLM with tool/function calling | Open (Phase 2) |
-| [TIERS] | Free / Pro / Premium | Default |
+| [TIERS] | none (personal use) | Decided 2026-09-30 |
 | [BROKER_LINKING] | Off until Phase 3; SnapTrade read-only | Default |
-| [JURISDICTIONS] | US-first; GDPR/CCPA-ready | Default |
+| [JURISDICTIONS] | n/a (personal use) | Decided 2026-09-30 |
+
+**Scope note: personal use only (owner decision, 2026-09-30).** Nothing from this system is shown to anyone other than the owner. That changes the brief's licensing picture: personal data plans are sufficient, and no display/redistribution contract is needed. Spec items that exist only for a public or commercial site are out of scope unless this changes: SEO pages and sitemaps, Stripe billing and tiers, public legal pages, cookie consent, marketing-copy rules, vendor display contracts and exchange subscriber attestation. Everything else still applies, including every MUST DO / MUST NOT rule, source and as-of labels on every number, and keeping personal-plan data off any public URL.
 
 ---
 

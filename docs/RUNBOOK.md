@@ -87,7 +87,7 @@ Raw data is re-fetchable, so after restoring a backup older than the RPO:
 
 The merge only inserts or corrects, so overlapping ranges are safe.
 
-## EDGAR live run (Phase 0 acceptance, pending)
+## EDGAR live run (Phase 0 acceptance; passed 2026-09-30)
 
 1. Set `EDGAR_ENABLED=true`, `APP_NAME=<brand>` and `SEC_CONTACT_EMAIL=<real monitored address>`, with Redis running.
 2. Run:

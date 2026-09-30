@@ -4,15 +4,15 @@ Informational, not legal advice. The owner consults a securities attorney before
 
 ## Per-provider checklist
 
-| Provider    | Display                                       | Attribution                                                                                                                | Caching / storage                       | Export      | Derived data                                                   | Status                                                   |
-| ----------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ----------- | -------------------------------------------------------------- | -------------------------------------------------------- |
-| Synthetic   | non-production only, with SAMPLE DATA banner  | "SAMPLE DATA: synthetic, not real market data"                                                                             | n/a                                     | no          | n/a                                                            | enforced in code                                         |
-| Tiingo      | **not until contracted**                      | TBD by contract (placeholder "Data provided by Tiingo")                                                                    | TBD (ask)                               | TBD (ask)   | TBD (ask: our adjusted series are derived from their raw data) | ✗ contract pending                                       |
-| Twelve Data | not until contracted                          | TBD                                                                                                                        | TBD                                     | TBD         | TBD                                                            | ✗ not selected                                           |
-| Massive     | not until contracted                          | TBD                                                                                                                        | TBD                                     | TBD         | TBD                                                            | ✗ growth stage                                           |
-| SEC EDGAR   | yes (public domain)                           | "Source: SEC EDGAR" (courtesy, not required)                                                                               | allowed; fair-access limits on fetching | allowed     | allowed                                                        | ✓ limiter + User-Agent in code; live run pending contact |
-| FRED        | yes, for series without third-party copyright | **required**: "This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis." | the terms are silent on storage         | not planned | allowed for public-domain series                               | ✓ notice stored; copyrighted series refused              |
-| Treasury    | yes (public domain)                           | "Source: U.S. Department of the Treasury"                                                                                  | allowed                                 | allowed     | allowed                                                        | adapter not built                                        |
+| Provider    | Display                                                                   | Attribution                                                                                                                | Caching / storage                       | Export        | Derived data                     | Status                                             |
+| ----------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------- | -------------------------------- | -------------------------------------------------- |
+| Synthetic   | non-production only, with SAMPLE DATA banner                              | "SAMPLE DATA: synthetic, not real market data"                                                                             | n/a                                     | no            | n/a                              | enforced in code                                   |
+| Tiingo      | owner only (personal plan, 2026-09-30); a public display needs a contract | per Tiingo terms for personal use                                                                                          | per personal-plan terms                 | not to others | owner-only use                   | ✓ personal use; contract only if ever shared       |
+| Twelve Data | not until contracted                                                      | TBD                                                                                                                        | TBD                                     | TBD           | TBD                              | ✗ not selected                                     |
+| Massive     | not until contracted                                                      | TBD                                                                                                                        | TBD                                     | TBD           | TBD                              | ✗ growth stage                                     |
+| SEC EDGAR   | yes (public domain)                                                       | "Source: SEC EDGAR" (courtesy, not required)                                                                               | allowed; fair-access limits on fetching | allowed       | allowed                          | ✓ limiter + User-Agent; live run passed 2026-09-30 |
+| FRED        | yes, for series without third-party copyright                             | **required**: "This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis." | the terms are silent on storage         | not planned   | allowed for public-domain series | ✓ notice stored; copyrighted series refused        |
+| Treasury    | yes (public domain)                                                       | "Source: U.S. Department of the Treasury"                                                                                  | allowed                                 | allowed       | allowed                          | adapter not built                                  |
 
 **Questions for each commercial vendor before signing:**
 
@@ -39,8 +39,15 @@ Informational, not legal advice. The owner consults a securities attorney before
 | SEC fair access (§2.3)                                              | shared 8 req/s limiter, fail closed, declared User-Agent                                                                                                                | `rate-limit.int.test.ts`, `sec-edgar.test.ts`                                    |
 | Licensed display confirmed before going public (Phase 1 acceptance) | `DATA_SOURCES.md` status column                                                                                                                                         | manual                                                                           |
 
+## Personal-use posture (2026-09-30)
+
+The owner uses this system alone, and that is what makes personal data plans acceptable:
+
+- the app is reachable only by the owner (localhost, or behind authentication if deployed);
+- personal-plan data never goes on a public URL, in a shared screenshot, in an export given to others, or into the public git repository;
+- the publisher's-exclusion analysis (§13) matters only if the system is ever published. Keep the "not investment advice" wording anyway; it costs nothing.
+
 ## Owner actions outstanding
 
-1. Choose a brand and domain, and set up a business email. This unblocks the SEC User-Agent and the live EDGAR acceptance run.
-2. Get written display terms from Tiingo (and a fallback vendor if live failover is wanted). Save them to `docs/legal/` in a private location.
-3. Book a securities attorney before Phase 1 launches publicly (publisher's exclusion posture, disclaimers, backtest presentation).
+1. Get a free Tiingo personal key for real prices (Phase 1). Optionally a FRED key (macro) and a Finnhub key (earnings calendar).
+2. If the system is ever shared or published: get display licenses and attorney review first (brief Parts D–E).

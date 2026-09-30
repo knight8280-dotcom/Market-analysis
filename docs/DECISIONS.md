@@ -94,10 +94,12 @@ Each entry: context, decision, alternatives rejected, consequences. Newest last.
   3. Repeated provider errors (3 consecutive) still route to "none": jobs fail fast, and readers serve last-good data.
 - **Found in practice:** running the monitor against the local 500-ticker database made it fail over to "none" and back in the same tick. The regression test fails without fix 1.
 
-## ADR-012: EDGAR acceptanceDateTime read as Eastern time (unverified)
+## ADR-012: EDGAR acceptanceDateTime is UTC (supersedes the Eastern-time assumption)
 
-- **Decision:** treat the wall-clock part of `acceptanceDateTime` as America/New_York, even though the string ends in `Z`.
-- **Why:** if the assumption is wrong, filings look public 4–5 hours later than they were, which is conservative for point-in-time data. The opposite error would create look-ahead bias. Verify on the first live run (`DATA_SOURCES.md`).
+- **Original decision (unverified):** read the wall-clock part of `acceptanceDateTime` as Eastern, as the conservative choice for point-in-time data.
+- **Verified 2026-09-30 on the live run:** the value is true UTC. Apple's FY2025 10-K has `2025-10-31T10:01:26.000Z` in the JSON and "Accepted 2025-10-31 06:01:26" (Eastern) on its index page.
+- **Decision:** parse it as ISO UTC, falling back to 00:00 ET on the filing date when it is missing or malformed.
+- **Filings self-heal:** re-ingesting updates stored rows whose parsed metadata differs, so the 4–5h error is corrected without a migration.
 
 ## ADR-013: Stored numeric precision and driver parsing
 
@@ -132,3 +134,13 @@ Spec rule 8 requires each dependency's license, maintenance status and bundle im
 | @types/node, @types/pg, @types/react, @types/react-dom | 24.19.0, 8.23.1, 19.3.0, 19.3.0  | MIT        | dev                         | typings                                                                                                                                   |
 
 CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account repositories. An organization owner would need a `GITLEAKS_LICENSE`, or would switch to running the gitleaks binary directly.
+
+## ADR-015: Personal use only
+
+- **Context:** the brief describes a public, commercial site. On 2026-09-30 the owner decided the system is for personal use only.
+- **Decision:**
+  - Personal data plans are sufficient. The system never shows data to anyone else, and never on a public URL.
+  - Drop items that exist only for a public or commercial site: SEO pages and sitemaps, Stripe billing and tiers, public legal pages, cookie consent, marketing-copy rules, vendor display contracts and exchange subscriber attestation.
+  - Keep every MUST DO / MUST NOT rule, source and as-of labels, and the SAMPLE DATA banner.
+  - Run locally by default. A private cloud deploy is optional and needs Supabase Auth.
+- **Consequences:** if the system is ever shared or published, the licensing work in `DATA_SOURCES.md` and the dropped items come back first. Phase 1 is re-planned in `plans/PHASE_1_PLAN.md`.

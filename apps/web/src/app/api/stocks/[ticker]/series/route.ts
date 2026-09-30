@@ -1,6 +1,7 @@
 import { loadWebEnv } from "@market/config";
 import type { NextRequest } from "next/server";
 import { ownerOr401 } from "../../../../../server/auth/owner";
+import { earningsDates } from "../../../../../server/calendars";
 import { db } from "../../../../../server/db";
 import {
   assertDisplayable,
@@ -35,11 +36,12 @@ export async function GET(
   }
   assertDisplayable(source, "daily_bars", loadWebEnv().APP_ENV);
   const benchmark = ticker === BENCHMARK ? null : await findSecurity(database, BENCHMARK);
-  const [bars, actions, updated, bench] = await Promise.all([
+  const [bars, actions, updated, bench, earnings] = await Promise.all([
     dailySeries(database, security.securityId, source, adjusted),
     chartActions(database, security.securityId, source),
     lastUpdated(database, source),
     benchmark ? dailySeries(database, benchmark.securityId, source, true) : Promise.resolve([]),
+    earningsDates(database, security.securityId, security.cik),
   ]);
   return Response.json(
     {
@@ -51,6 +53,7 @@ export async function GET(
       fetchedAt: updated.loadedAt,
       bars,
       actions,
+      earnings,
       benchmark: bench.length
         ? { ticker: BENCHMARK, closes: bench.map((b) => [b[0], b[4]]) }
         : null,

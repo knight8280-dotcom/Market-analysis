@@ -20,8 +20,12 @@ export interface ScheduleConfig {
   edgarAt: string;
   /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
   screenerAt: string;
+  /** Earnings and economic calendars, refreshed before the open. */
+  calendarsAt: string;
   reconcileDays: number;
   edgarEnabled: boolean;
+  earningsEnabled: boolean;
+  releasesEnabled: boolean;
   macroSeries: readonly string[];
 }
 
@@ -32,8 +36,11 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   macroAt: "18:00",
   edgarAt: "21:00",
   screenerAt: "18:45",
+  calendarsAt: "06:30",
   reconcileDays: 5,
   edgarEnabled: false,
+  earningsEnabled: false,
+  releasesEnabled: false,
   macroSeries: [],
 };
 
@@ -85,6 +92,14 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
         data: { seriesId },
         jobId: jobId(JOBS.ingestMacro, today, seriesId),
       });
+    }
+  }
+  if (etMinutes >= minutesOfDay(cfg.calendarsAt)) {
+    if (cfg.earningsEnabled) {
+      jobs.push({ name: JOBS.ingestEarnings, data: {}, jobId: jobId(JOBS.ingestEarnings, today) });
+    }
+    if (cfg.releasesEnabled) {
+      jobs.push({ name: JOBS.ingestReleases, data: {}, jobId: jobId(JOBS.ingestReleases, today) });
     }
   }
   if (etMinutes >= minutesOfDay(cfg.screenerAt)) {

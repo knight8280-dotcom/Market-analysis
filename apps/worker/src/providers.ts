@@ -5,6 +5,7 @@ import {
   type ProviderId,
   type RoutingTable,
 } from "@market/market-data";
+import { FinnhubProvider } from "@market/market-data/adapters/finnhub";
 import { FredProvider } from "@market/market-data/adapters/fred";
 import { SecEdgarProvider } from "@market/market-data/adapters/sec-edgar";
 import { SyntheticProvider } from "@market/market-data/adapters/synthetic";
@@ -60,6 +61,21 @@ export function buildProviders(
         appName: env.APP_NAME,
         contactEmail: env.SEC_CONTACT_EMAIL,
         rateLimiter: new RedisSlidingWindowLimiter(needRedis("EDGAR"), SEC_RATE_LIMIT),
+        now: deps.now,
+      }),
+    );
+  }
+  if (env.FINNHUB_API_KEY) {
+    providers.set(
+      "finnhub",
+      new FinnhubProvider({
+        apiKey: env.FINNHUB_API_KEY,
+        // Free plan: 60 calls/minute; stay at half.
+        rateLimiter: new RedisSlidingWindowLimiter(needRedis("Finnhub"), {
+          key: "ratelimit:finnhub",
+          limit: 30,
+          windowMs: 60_000,
+        }),
         now: deps.now,
       }),
     );

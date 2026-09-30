@@ -36,6 +36,8 @@ interface ChartData {
   fetchedAt: string | null;
   bars: [string, number, number, number, number, number][];
   actions: { date: string; type: string; label: string }[];
+  /** Earnings report dates (Finnhub or 8-K Item 2.02). */
+  earnings: string[];
   benchmark: { ticker: string; closes: [string, number][] } | null;
 }
 
@@ -261,17 +263,30 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
       );
 
       const dates = new Set(bars.time);
-      lc.createSeriesMarkers(
-        main,
-        data.actions
+      // Markers must be in time order; corporate actions sit above the bar, earnings below.
+      const markers = [
+        ...data.actions
           .filter((a) => dates.has(a.date))
           .map((a) => ({
-            time: a.date,
+            date: a.date,
             position: "aboveBar" as const,
             shape: a.type.includes("dividend") ? ("circle" as const) : ("square" as const),
             color: cssColor("--warning"),
             text: a.type === "cash_dividend" ? "D" : a.label,
           })),
+        ...data.earnings
+          .filter((d) => dates.has(d))
+          .map((d) => ({
+            date: d,
+            position: "belowBar" as const,
+            shape: "circle" as const,
+            color: cssColor("--primary"),
+            text: "E",
+          })),
+      ].sort((a, b) => a.date.localeCompare(b.date));
+      lc.createSeriesMarkers(
+        main,
+        markers.map(({ date, ...m }) => ({ ...m, time: date as Time })),
       );
 
       const addLine = (

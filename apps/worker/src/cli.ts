@@ -38,6 +38,8 @@ import { loadUniverse } from "./universe";
  *   statements [--ciks 320193,789019]   (default: every registrant with facts)
  *   check-statements [--ciks ...]        (default: 10 large filers; live SEC requests)
  *   screener
+ *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
+ *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
  *   macro [--series DGS10,UNRATE]
  *   monitor [--at 2026-09-29T22:31:00Z]
  *   partitions
@@ -429,6 +431,22 @@ async function main(): Promise<void> {
       case "screener":
         print(await runJob(ctx, JOBS.refreshScreener, {}));
         break;
+
+      case "earnings":
+      case "releases": {
+        const window = {
+          ...(flag("from") ? { from: flag("from") } : {}),
+          ...(flag("to") ? { to: flag("to") } : {}),
+        };
+        print(
+          await runJob(
+            ctx,
+            command === "earnings" ? JOBS.ingestEarnings : JOBS.ingestReleases,
+            window,
+          ),
+        );
+        break;
+      }
 
       case "macro": {
         for (const seriesId of list(flag("series")) ?? DEFAULT_MACRO_SERIES) {

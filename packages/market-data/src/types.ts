@@ -224,3 +224,26 @@ export const MacroObservation = Provenance.extend({
   realtime_start: IsoDateString,
 });
 export type MacroObservation = z.infer<typeof MacroObservation>;
+
+/** A scheduled or reported earnings release (Finnhub earnings calendar). */
+export const EarningsEvent = Provenance.extend({
+  source_symbol: z.string().min(1),
+  report_date: IsoDateString,
+  /** bmo: before the open; amc: after the close; dmh: during market hours; null: not given. */
+  hour: z.enum(["bmo", "amc", "dmh"]).nullable(),
+  fiscal_year: z.number().int().nullable(),
+  fiscal_quarter: z.number().int().min(1).max(4).nullable(),
+  eps_estimate: finite.nullable(),
+  eps_actual: finite.nullable(),
+  revenue_estimate: finite.nullable(),
+  revenue_actual: finite.nullable(),
+});
+export type EarningsEvent = z.infer<typeof EarningsEvent>;
+
+/** A scheduled economic data release (FRED release dates). */
+export const EconomicRelease = Provenance.extend({
+  release_id: z.number().int().positive(),
+  name: z.string().min(1),
+  release_date: IsoDateString,
+});
+export type EconomicRelease = z.infer<typeof EconomicRelease>;

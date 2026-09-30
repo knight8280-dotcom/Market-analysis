@@ -97,6 +97,16 @@ export async function seedFinancials(databaseUrl: string): Promise<void> {
             ${r.restated}, 'sec_edgar')
         `.execute(trx);
       }
+      // A made-up 8-K Item 2.02 ("Results of Operations") three days ago, for the earnings
+      // calendar and chart markers.
+      const reported = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+      await sql`delete from market.filings where cik = ${CIK}`.execute(trx);
+      await sql`
+        insert into market.filings (accession_no, cik, form_type, filed_at, filing_date, items,
+          url, source)
+        values ('0000000042-26-000100', ${CIK}, '8-K', ${`${reported}T21:05:00Z`}, ${reported},
+          '{2.02,9.01}', 'https://example.invalid/test-fin/8-k', 'sec_edgar')
+      `.execute(trx);
       const existing = await sql<{ security_id: string }>`
         select security_id from market.securities where ticker = 'TEST_FIN'
       `.execute(trx);

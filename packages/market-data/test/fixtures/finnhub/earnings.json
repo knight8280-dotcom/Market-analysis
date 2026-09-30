@@ -1,0 +1,37 @@
+{
+  "earningsCalendar": [
+    {
+      "date": "2026-10-20",
+      "epsActual": null,
+      "epsEstimate": 1.25,
+      "hour": "amc",
+      "quarter": 3,
+      "revenueActual": null,
+      "revenueEstimate": 2500000000,
+      "symbol": "TEST_DIV",
+      "year": 2026
+    },
+    {
+      "date": "2026-09-22",
+      "epsActual": 0.51,
+      "epsEstimate": 0.5,
+      "hour": "bmo",
+      "quarter": 3,
+      "revenueActual": 1010000000,
+      "revenueEstimate": 1000000000,
+      "symbol": "TEST_SPLIT4",
+      "year": 2026
+    },
+    {
+      "date": "2026-10-28",
+      "epsActual": null,
+      "epsEstimate": null,
+      "hour": "",
+      "quarter": null,
+      "revenueActual": null,
+      "revenueEstimate": null,
+      "symbol": "NOT_IN_UNIVERSE",
+      "year": null
+    }
+  ]
+}

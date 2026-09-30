@@ -3,6 +3,7 @@ import { NotSupportedError } from "./errors";
 import type {
   CorporateAction,
   DailyBar,
+  EarningsEvent,
   FilingRecord,
   FundamentalFact,
   MacroObservation,
@@ -40,6 +41,8 @@ export interface MarketDataProvider {
   getFilings(req: { cik: string }): Promise<FilingRecord[]>;
   getMacroSeries(req: { seriesId: string }): Promise<MacroSeries>;
   getMacroObservations(req: { seriesId: string; start?: IsoDate }): Promise<MacroObservation[]>;
+  /** Earnings dates, estimates and actuals between two dates (inclusive). */
+  getEarningsCalendar(req: { from: IsoDate; to: IsoDate }): Promise<EarningsEvent[]>;
   /** Cheap request proving the vendor is reachable and our credentials work. */
   healthCheck(): Promise<void>;
 
@@ -48,7 +51,6 @@ export interface MarketDataProvider {
   getQuoteSnapshot(req: unknown): Promise<never>;
   streamQuotes(req: unknown): AsyncIterable<never>;
   getNews(req: unknown): Promise<never>;
-  getEarningsCalendar(req: unknown): Promise<never>;
   getInsiderTransactions(req: unknown): Promise<never>;
   getInstitutionalHoldings(req: unknown): Promise<never>;
   getOptionsChain(req: unknown): Promise<never>;
@@ -97,7 +99,7 @@ export abstract class BaseProvider implements MarketDataProvider {
   getNews(_req: unknown): Promise<never> {
     return this.unsupported("getNews");
   }
-  getEarningsCalendar(_req: unknown): Promise<never> {
+  getEarningsCalendar(_req: { from: IsoDate; to: IsoDate }): Promise<EarningsEvent[]> {
     return this.unsupported("getEarningsCalendar");
   }
   getInsiderTransactions(_req: unknown): Promise<never> {

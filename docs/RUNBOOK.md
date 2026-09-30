@@ -129,6 +129,15 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - The snapshot rebuilds at 18:45 ET; to rebuild now: `pnpm worker screener` (a few seconds). The page shows the snapshot's as-of date.
 - Saved screens are rows in `public.saved_screens` for the owner's user id.
 
+## Calendars and heatmap
+
+- **Earnings** (optional, needs `FINNHUB_API_KEY`, a free personal key): the worker loads 14 days back to 90 days ahead at 06:30 ET; by hand: `pnpm worker earnings [--from 2026-10-01 --to 2026-12-31]`. Dates a company has moved are removed from the future part of the window. Without a key, the calendar still shows past report dates from 8-K Item 2.02 filings once EDGAR data is loaded.
+- **First run with the Finnhub key: check the payload shape.** The adapter follows Finnhub's documentation (marked SHAPE UNVERIFIED in the code). Run `pnpm worker earnings`: a changed shape fails the job with the offending field paths (see `/admin/data-health`); matched events appear on `/calendar`. Never commit the response.
+- **Economic releases** (needs `FRED_ENABLED=true` and `FRED_API_KEY`): release dates 7 days back to 60 ahead at 06:30 ET; by hand: `pnpm worker releases`. The calendar lists the major ones (jobs, CPI, PPI, GDP, PCE, retail sales, industrial production, JOLTS) with "Show all".
+- **Dividends and splits** come from the price source's corporate actions (last 60 days).
+- **.ics export:** "Download .ics" on each calendar tab, signed in. It is a download, not a subscription link, so nothing is reachable without the owner's session; re-import after a refresh (event ids are stable, so calendar apps update rather than duplicate).
+- **Heatmap** (`/heatmap`) reads the screener snapshot (`pnpm worker screener` rebuilds it). Tiles are sized by market cap (SEC shares outstanding × close); securities without shares outstanding are left out and counted, and when none has a market cap (synthetic data) the map sizes by 30-day dollar volume instead.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

@@ -78,4 +78,17 @@ describe("FredProvider", () => {
     expect(err.message).toContain("api_key=REDACTED");
     expect(err.message).not.toContain("fred-key-for-tests-only");
   });
+
+  it("lists scheduled release dates as public-domain records", async () => {
+    const { p, calls } = provider({ "/fred/releases/dates": "fred/release-dates.json" });
+    const releases = await p.getReleaseDates({ from: "2026-09-30", to: "2026-11-30" });
+    expect(releases.map((r) => [r.release_id, r.name, r.release_date])).toEqual([
+      [50, "Employment Situation", "2026-10-02"],
+      [10, "Consumer Price Index", "2026-10-14"],
+      [53, "Gross Domestic Product", "2026-10-29"],
+    ]);
+    expect(releases[0]).toMatchObject({ source: "fred", license_tier: "public_domain" });
+    const url = new URL(calls[0]!.url);
+    expect(url.searchParams.get("include_release_dates_with_no_data")).toBe("true");
+  });
 });

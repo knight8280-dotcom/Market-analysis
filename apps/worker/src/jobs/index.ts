@@ -12,6 +12,7 @@ import { ingestEod, reconcileEod, scheduleEod } from "./ingest-eod";
 import { ingestMacro } from "./ingest-macro";
 import { ingestSecurities } from "./ingest-securities";
 import { recomputeAdjustments } from "./recompute-adjustments";
+import { ingestEarnings, ingestReleases } from "./calendars";
 import { refreshScreener } from "./screener";
 import { stalenessMonitor } from "./staleness-monitor";
 
@@ -33,6 +34,8 @@ export const HANDLERS: Readonly<Record<JobName, Handler>> = {
   "ensure-partitions": (ctx) => ensurePartitions(ctx),
   "staleness-monitor": (ctx) => stalenessMonitor(ctx),
   "refresh-screener": (ctx) => refreshScreener(ctx),
+  "ingest-earnings": ingestEarnings,
+  "ingest-releases": ingestReleases,
 };
 
 export function runJob(ctx: WorkerContext, name: JobName, data: unknown): Promise<unknown> {

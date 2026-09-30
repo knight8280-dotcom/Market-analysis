@@ -94,6 +94,31 @@ export interface MarketDataProviders {
   provider_id: string;
 }
 
+export interface MarketEarningsEvents {
+  eps_actual: Numeric | null;
+  eps_estimate: Numeric | null;
+  fetched_at: Timestamp;
+  fiscal_quarter: number | null;
+  fiscal_year: number | null;
+  /**
+   * bmo: before the open; amc: after the close; dmh: during market hours.
+   */
+  hour: string | null;
+  report_date: string;
+  revenue_actual: Numeric | null;
+  revenue_estimate: Numeric | null;
+  security_id: Int8;
+  source: string;
+}
+
+export interface MarketEconomicReleases {
+  fetched_at: Timestamp;
+  name: string;
+  release_date: string;
+  release_id: number;
+  source: string;
+}
+
 export interface MarketFilings {
   accession_no: string;
   cik: string;
@@ -425,6 +450,8 @@ export interface DB {
   "market.adjustment_factors": MarketAdjustmentFactors;
   "market.corporate_actions": MarketCorporateActions;
   "market.data_providers": MarketDataProviders;
+  "market.earnings_events": MarketEarningsEvents;
+  "market.economic_releases": MarketEconomicReleases;
   "market.filings": MarketFilings;
   "market.financial_statements": MarketFinancialStatements;
   "market.fundamentals_facts": MarketFundamentalsFacts;

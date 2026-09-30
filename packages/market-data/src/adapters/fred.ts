@@ -3,7 +3,7 @@ import { z } from "zod";
 import { LicenseRestrictedError, ProviderResponseError } from "../errors";
 import { HttpClient, type HttpClientOptions } from "../http";
 import { BaseProvider } from "../provider";
-import { MacroObservation, MacroSeries } from "../types";
+import { EconomicRelease, MacroObservation, MacroSeries } from "../types";
 import { parseVendor } from "./common";
 
 /**
@@ -42,6 +42,19 @@ const ObservationsPayload = z.object({
       realtime_end: z.string(),
       date: z.string(),
       value: z.string(),
+    }),
+  ),
+});
+
+const ReleaseDatesPayload = z.object({
+  count: z.number().int(),
+  offset: z.number().int(),
+  limit: z.number().int(),
+  release_dates: z.array(
+    z.object({
+      release_id: z.number().int(),
+      release_name: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     }),
   ),
 });
@@ -161,6 +174,47 @@ export class FredProvider extends BaseProvider {
           realtime_start: o.realtime_start,
         },
         "observation",
+      ),
+    );
+  }
+
+  /**
+   * Scheduled release dates (the economic calendar), including dates with no data yet, for a
+   * date window. FRED publishes the schedule ahead for most major releases.
+   */
+  async getReleaseDates(req: { from: IsoDate; to: IsoDate }): Promise<EconomicRelease[]> {
+    const fetchedAt = this.now();
+    const raw = await this.http.getJson(
+      this.url("/fred/releases/dates", {
+        realtime_start: req.from,
+        realtime_end: req.to,
+        include_release_dates_with_no_data: "true",
+        sort_order: "asc",
+        limit: "1000",
+      }),
+    );
+    const payload = parseVendor(this.id, ReleaseDatesPayload, raw, "release dates");
+    if (payload.count > payload.offset + payload.release_dates.length) {
+      throw new ProviderResponseError(
+        this.id,
+        `FRED returned ${payload.release_dates.length} of ${payload.count} release dates; narrow the window`,
+      );
+    }
+    return payload.release_dates.map((r) =>
+      parseVendor(
+        this.id,
+        EconomicRelease,
+        {
+          source: this.id,
+          source_symbol: String(r.release_id),
+          fetched_at: fetchedAt,
+          as_of: fetchedAt,
+          license_tier: "public_domain",
+          release_id: r.release_id,
+          name: r.release_name,
+          release_date: r.date,
+        },
+        "release date",
       ),
     );
   }

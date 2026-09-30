@@ -26,6 +26,7 @@ export const JOBS = {
   ingestMacro: "ingest-macro",
   ensurePartitions: "ensure-partitions",
   stalenessMonitor: "staleness-monitor",
+  refreshScreener: "refresh-screener",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -43,6 +44,7 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "ingest-macro": QUEUES.macro,
   "ensure-partitions": QUEUES.maintenance,
   "staleness-monitor": QUEUES.monitor,
+  "refresh-screener": QUEUES.maintenance,
 };
 
 /**

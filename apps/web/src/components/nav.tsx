@@ -1,13 +1,14 @@
 "use client";
 
 import { cn } from "@market/ui";
-import { Activity, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { Activity, Filter, LayoutDashboard, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /** Left navigation (spec §6). Sections are added here as each Phase 1 group ships. */
 export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Markets", icon: LayoutDashboard },
+  { href: "/screener", label: "Screener", icon: Filter },
   { href: "/admin/data-health", label: "Data health", icon: Activity },
 ];
 

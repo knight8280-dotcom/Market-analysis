@@ -12,7 +12,8 @@
     "./adapters/tiingo": "./src/adapters/tiingo.ts",
     "./adapters/synthetic": "./src/adapters/synthetic.ts",
     "./statements": "./src/statements.ts",
-    "./edgar-report": "./src/edgar-report.ts"
+    "./edgar-report": "./src/edgar-report.ts",
+    "./sectors": "./src/sectors.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

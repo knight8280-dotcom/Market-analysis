@@ -20,7 +20,7 @@ run(async () => {
         "--url",
         url,
         "--include-pattern",
-        "{market,ops}.*",
+        "{market,ops,public}.*",
         "--date-parser",
         "string",
         "--numeric-parser",

@@ -1,0 +1,25 @@
+{
+  "name": "@market/screener",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fields": "./src/fields.ts",
+    "./schema": "./src/schema.ts",
+    "./presets": "./src/presets.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:int": "vitest run --config vitest.int.config.ts"
+  },
+  "dependencies": {
+    "@market/db": "workspace:*",
+    "@market/indicators": "workspace:*",
+    "@market/market-data": "workspace:*",
+    "kysely": "0.29.6",
+    "zod": "4.6.5"
+  }
+}

@@ -408,6 +408,10 @@ export function decimalSub(a: string, b: string): string {
   return formatDecimal(nx - ny, scale);
 }
 
+export function decimalAdd(a: string, b: string): string {
+  return decimalSub(a, b.startsWith("-") ? b.slice(1) : `-${b}`);
+}
+
 // --- Periods ---------------------------------------------------------------------------------
 
 const DAY = 86_400_000;

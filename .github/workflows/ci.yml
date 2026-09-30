@@ -110,10 +110,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Migrate and load one year of synthetic data
+      - name: Migrate, load one year of synthetic data and build the screener snapshot
         run: |
           pnpm db:shim && pnpm db:migrate
           pnpm worker backfill --from 2025-01-02 --to 2025-12-31 --source synthetic
+          pnpm worker screener
       - run: pnpm --filter @market/web exec playwright install --with-deps chromium
       - run: pnpm --filter @market/web build
       - run: pnpm --filter @market/web test:e2e

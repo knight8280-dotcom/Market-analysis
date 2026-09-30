@@ -21,6 +21,7 @@
     "@market/db": "workspace:*",
     "@market/indicators": "workspace:*",
     "@market/market-data": "workspace:*",
+    "@market/screener": "workspace:*",
     "@market/ui": "workspace:*",
     "lightweight-charts": "5.2.1",
     "lucide-react": "1.49.0",

@@ -27,6 +27,41 @@ export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AlertEvents {
+  alert_id: Int8;
+  bar_date: string;
+  delivered_at: Timestamp | null;
+  delivery_status: Generated<string>;
+  error: string | null;
+  event_id: Generated<Int8>;
+  fired_at: Generated<Timestamp>;
+  message: string;
+  user_id: string;
+}
+
+export interface Alerts {
+  active: Generated<boolean>;
+  alert_id: Generated<Int8>;
+  cooldown_hours: Generated<number>;
+  created_at: Generated<Timestamp>;
+  kind: string;
+  last_fired_at: Timestamp | null;
+  params: Generated<Json>;
+  security_id: Int8;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface AuditLogs {
+  action: string;
+  at: Generated<Timestamp>;
+  audit_id: Generated<Int8>;
+  details: Generated<Json>;
+  entity: string | null;
+  entity_id: string | null;
+  user_id: string | null;
+}
+
 export interface MarketAdjustmentFactors {
   computed_at: Generated<Timestamp>;
   dividend_factor: number;
@@ -177,6 +212,43 @@ export interface MarketProviderSymbols {
   valid_to: string | null;
 }
 
+export interface MarketScreenerSnapshot {
+  as_of: string;
+  asset_class: string;
+  avg_volume_30d: number | null;
+  change_1d: number | null;
+  close: Numeric;
+  dividend_yield: number | null;
+  equity: Numeric | null;
+  exchange_mic: string | null;
+  fundamentals_as_of: string | null;
+  high_52w: number | null;
+  industry: string | null;
+  low_52w: number | null;
+  market_cap: number | null;
+  name: string;
+  net_income_ttm: Numeric | null;
+  pb: number | null;
+  pe: number | null;
+  ps: number | null;
+  refreshed_at: Generated<Timestamp>;
+  return_1m: number | null;
+  return_1w: number | null;
+  return_1y: number | null;
+  return_3m: number | null;
+  return_6m: number | null;
+  return_ytd: number | null;
+  revenue_ttm: Numeric | null;
+  rsi14: number | null;
+  sector: string | null;
+  security_id: Int8;
+  shares_outstanding: Numeric | null;
+  sma200: number | null;
+  sma50: number | null;
+  source: string;
+  ticker: string;
+}
+
 export interface MarketSecurities {
   asset_class: string;
   cik: string | null;
@@ -294,7 +366,62 @@ export interface OpsProviderHealth {
   updated_at: Generated<Timestamp>;
 }
 
+export interface Portfolios {
+  base_currency: Generated<string>;
+  benchmark_ticker: Generated<string>;
+  created_at: Generated<Timestamp>;
+  name: string;
+  portfolio_id: Generated<Int8>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface SavedScreens {
+  created_at: Generated<Timestamp>;
+  definition: Json;
+  name: string;
+  screen_id: Generated<Int8>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface Transactions {
+  amount: Numeric | null;
+  created_at: Generated<Timestamp>;
+  fees: Generated<Numeric>;
+  notes: string | null;
+  portfolio_id: Int8;
+  price: Numeric | null;
+  quantity: Numeric | null;
+  security_id: Int8 | null;
+  source: Generated<string>;
+  trade_date: string;
+  transaction_id: Generated<Int8>;
+  type: string;
+  user_id: string;
+}
+
+export interface WatchlistItems {
+  added_at: Generated<Timestamp>;
+  position: Generated<number>;
+  security_id: Int8;
+  user_id: string;
+  watchlist_id: Int8;
+}
+
+export interface Watchlists {
+  created_at: Generated<Timestamp>;
+  name: string;
+  position: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  watchlist_id: Generated<Int8>;
+}
+
 export interface DB {
+  alert_events: AlertEvents;
+  alerts: Alerts;
+  audit_logs: AuditLogs;
   "market.adjustment_factors": MarketAdjustmentFactors;
   "market.corporate_actions": MarketCorporateActions;
   "market.data_providers": MarketDataProviders;
@@ -306,6 +433,7 @@ export interface DB {
   "market.prices_daily": MarketPricesDaily;
   "market.prices_daily_adjusted": MarketPricesDailyAdjusted;
   "market.provider_symbols": MarketProviderSymbols;
+  "market.screener_snapshot": MarketScreenerSnapshot;
   "market.securities": MarketSecurities;
   "market.security_symbol_history": MarketSecuritySymbolHistory;
   "ops.alerts": OpsAlerts;
@@ -314,4 +442,9 @@ export interface DB {
   "ops.data_quality_issues": OpsDataQualityIssues;
   "ops.dataset_routing": OpsDatasetRouting;
   "ops.provider_health": OpsProviderHealth;
+  portfolios: Portfolios;
+  saved_screens: SavedScreens;
+  transactions: Transactions;
+  watchlist_items: WatchlistItems;
+  watchlists: Watchlists;
 }

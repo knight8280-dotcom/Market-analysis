@@ -37,6 +37,7 @@ import { loadUniverse } from "./universe";
  *   edgar --tickers AAPL,MSFT | --ciks 320193,789019 [--facts-only]
  *   statements [--ciks 320193,789019]   (default: every registrant with facts)
  *   check-statements [--ciks ...]        (default: 10 large filers; live SEC requests)
+ *   screener
  *   macro [--series DGS10,UNRATE]
  *   monitor [--at 2026-09-29T22:31:00Z]
  *   partitions
@@ -424,6 +425,10 @@ async function main(): Promise<void> {
         print({ companies, httpStatusCounts: Object.fromEntries(edgar.http.statusCounts) });
         break;
       }
+
+      case "screener":
+        print(await runJob(ctx, JOBS.refreshScreener, {}));
+        break;
 
       case "macro": {
         for (const seriesId of list(flag("series")) ?? DEFAULT_MACRO_SERIES) {

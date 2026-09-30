@@ -58,6 +58,7 @@ To add a symbol: add it to `config/universe.json` with its asset class, then run
 | 18:30                                      | EOD freshness deadline; the monitor alerts if coverage < 98% | page → alerts                     |
 | 02:00                                      | reconcile the last 5 sessions (corrections logged)           | `ops.data_corrections`            |
 | 03:00                                      | ensure this year's and next year's partitions exist          | alert kind `partition`            |
+| 18:45                                      | screener snapshot rebuilt from the day's bars                | runs for `screener`               |
 | 18:00 / 21:00                              | FRED series / EDGAR sweep: new CIKs, then filings (enabled)  | runs for `macro`, `filings`       |
 
 ### Incidents
@@ -118,6 +119,11 @@ The merge only inserts or corrects, so overlapping ranges are safe.
 
 3. Pass when the output's `httpStatusCounts` has no `403` or `429`, and `ops.data_ingestion_runs` shows 50 succeeded `fundamentals` runs.
 4. Afterwards, compare one `acceptanceDateTime` with the filing index page's "Accepted" time (`DATA_SOURCES.md`), and replace the hand-built fixtures with trimmed recordings. SEC data is public domain, so recordings may be committed.
+
+## Screener
+
+- The snapshot rebuilds at 18:45 ET; to rebuild now: `pnpm worker screener` (a few seconds). The page shows the snapshot's as-of date.
+- Saved screens are rows in `public.saved_screens` for the owner's user id.
 
 ## Financial statements
 

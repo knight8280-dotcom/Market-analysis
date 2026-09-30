@@ -18,6 +18,8 @@ export interface ScheduleConfig {
   macroAt: string;
   /** EDGAR sweeps run off-peak (SEC asks for bulk work outside business hours). */
   edgarAt: string;
+  /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
+  screenerAt: string;
   reconcileDays: number;
   edgarEnabled: boolean;
   macroSeries: readonly string[];
@@ -29,6 +31,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   partitionsAt: "03:00",
   macroAt: "18:00",
   edgarAt: "21:00",
+  screenerAt: "18:45",
   reconcileDays: 5,
   edgarEnabled: false,
   macroSeries: [],
@@ -83,6 +86,9 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
         jobId: jobId(JOBS.ingestMacro, today, seriesId),
       });
     }
+  }
+  if (etMinutes >= minutesOfDay(cfg.screenerAt)) {
+    jobs.push({ name: JOBS.refreshScreener, data: {}, jobId: jobId(JOBS.refreshScreener, today) });
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.edgarAt)) {
     jobs.push({ name: JOBS.scheduleEdgar, data: {}, jobId: jobId(JOBS.scheduleEdgar, today) });

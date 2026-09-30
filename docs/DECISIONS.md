@@ -185,3 +185,14 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Built by the `build-statements` job after each companyfacts load; stored in `market.financial_statements`.
 - **Checked:** against SEC's own rendering of each filing (the R pages from `FilingSummary.xml`, whose rows and columns come from the filing's presentation linkbase, which the builder never reads). 2026-09-30, 10 companies' latest 10-Ks: 301 values compared, all equal to the dollar (28 of them presented negated by SEC, e.g. capex), 0 mismatches; 40 requests, all HTTP 200.
 - **Consequences:** values a filer tags only with a company-specific or dimensioned concept stay blank rather than estimated (for example Wells Fargo revenue in some years; Visa and Alphabet diluted EPS, which are reported per share class). The first filing in companyfacts limits how far back periods go (usually 2009).
+
+## ADR-021: Screener over a nightly snapshot, with a whitelisted filter compiler
+
+- **Context:** the screener must answer any combination of filters over the whole universe in under a second (p95 at 6,000 securities) and never let user input reach SQL as code.
+- **Decision:**
+  - `refresh-screener` rebuilds `market.screener_snapshot` after the 18:30 end-of-day deadline (scheduled 18:45 ET): latest close, total returns over calendar windows from adjusted closes, SMA 50/200 and RSI 14 (TA-Lib conventions, ADR-019), 52-week range, 30-day volume, market cap (latest cover-page shares × close), TTM P/E, P/S, P/B and dividend yield. A return whose start falls in a gap in the data is left empty; ratios are empty unless the inputs are positive and reported.
+  - A screen is JSON (`@market/screener` schema): AND-ed conditions on whitelisted fields (constants, ranges, lists, null checks, or another numeric field) and a sort. The compiler emits identifiers only from the whitelist and binds every value. NULL never satisfies a comparison.
+  - An independent in-memory oracle evaluates the same screens; 300 random screens and every preset must match the SQL results and order exactly.
+  - Saved screens live in `public.saved_screens` (migration 10), per user, under RLS.
+- **Measured:** p95 10.9 ms over 47 screens at 6,000 synthetic securities (budget 1 s).
+- **Consequences:** results are as fresh as the last snapshot (shown with its as-of date). Presets are filters, not recommendations (spec §13). Migration order changed from the plan: 10 is now the per-user tables (needed for saved screens), 11 the earnings and economic calendars.

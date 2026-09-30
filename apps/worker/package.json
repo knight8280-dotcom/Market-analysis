@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx src/main.ts",
-    "cli": "tsx src/cli.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/main.ts",
+    "cli": "tsx --env-file-if-exists=../../.env src/cli.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",

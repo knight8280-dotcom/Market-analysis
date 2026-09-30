@@ -7,18 +7,26 @@ Commands assume the repository root, with env from `.env` (copy `.env.example`).
 ```sh
 docker compose up -d                 # postgres:17 + redis:7 (or native installs)
 pnpm install
-cp .env.example .env                 # set DATABASE_URL, REDIS_URL, admin credentials
+cp .env.example .env                 # one .env at the root serves the worker, web app and db scripts
+pnpm web:hash-password               # prompts for your password; paste both printed lines into .env
 pnpm db:shim && pnpm db:migrate      # shim = local stand-in for Supabase roles; never on Supabase
 pnpm worker backfill --from 2016-01-04 --to 2025-12-31 --source synthetic   # ~1.5 min
-pnpm --filter @market/web dev        # http://localhost:3000/admin/data-health (Basic auth)
+pnpm web                             # http://127.0.0.1:3000, sign in with your password
 pnpm --filter @market/worker start   # long-running worker + scheduler
 ```
+
+## Owner login
+
+- The web app binds to `127.0.0.1` and serves nothing without a session: pages redirect to `/login`, API routes answer 401 (ADR-018). Without `OWNER_PASSWORD_HASH` and `SESSION_SECRET` it answers 503 to everything.
+- **Change the password:** run `pnpm web:hash-password` again and replace both lines in `.env`. Every existing session ends.
+- **Locked out after 10 wrong passwords:** wait 15 minutes, or restart the web app.
+- **Reaching it from another device** (for example over a VPN) needs the host name in `WEB_ALLOWED_HOSTS` and HTTPS in front; other host names get 421 (DNS-rebinding guard). Personal-plan data must still reach only you.
 
 ## Real data (once the Tiingo key arrives)
 
 Personal use only (ADR-015): this data is for the owner's screen, never a public URL.
 
-1. In `.env`: `TIINGO_API_KEY=<key>`, `DATA_PROVIDER_PRIMARY=tiingo`, `DATA_PROVIDER_FALLBACK=none`, and for SEC data `EDGAR_ENABLED=true` with `SEC_CONTACT_EMAIL=<your email>`. Keep the key out of chat and commits.
+1. In `.env`: `APP_ENV=production` (this removes the SAMPLE DATA banner and makes the worker refuse synthetic data), `TIINGO_API_KEY=<key>`, `DATA_PROVIDER_PRIMARY=tiingo`, `DATA_PROVIDER_FALLBACK=none`, and for SEC data `EDGAR_ENABLED=true` with `SEC_CONTACT_EMAIL=<your email>`. Keep the key out of chat and commits.
 2. `pnpm worker verify-tiingo` (3 requests). It parses live responses through the adapter and prints field names and counts only. Record the result and date under Tiingo in `DATA_SOURCES.md`; never save the response.
 3. `pnpm worker bootstrap` loads the universe (`config/universe.json`), attaches SEC CIKs and SIC sectors, loads filings and fundamentals, then ten years of prices. On the free tier the price step is paced by the quota limiter: about 2 hours 40 minutes for 65 symbols. It is safe to stop and re-run; every step is idempotent.
 4. `pnpm worker monitor` should report every SLO as OK. Then start the long-running worker (`pnpm --filter @market/worker start`), which keeps prices current after each close and refreshes SEC data nightly.
@@ -27,13 +35,14 @@ To add a symbol: add it to `config/universe.json` with its asset class, then run
 
 ## Tests
 
-| Command                 | Needs                                                                                                     | Runs                                                     |
-| ----------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `pnpm test`             | nothing                                                                                                   | unit tests                                               |
-| `pnpm test:int`         | `TEST_DATABASE_URL` (a disposable server; tests create and drop their own databases) and `TEST_REDIS_URL` | integration tests                                        |
-| `pnpm test:acceptance`  | same                                                                                                      | 500 tickers × 10 years, twice (~2–3 min)                 |
-| `pnpm db:roundtrip`     | same                                                                                                      | every rollback script, plus the schema fingerprint check |
-| `pnpm db:codegen:check` | same                                                                                                      | generated types match the migrations                     |
+| Command                              | Needs                                                                                                                 | Runs                                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `pnpm test`                          | nothing                                                                                                               | unit tests                                                                       |
+| `pnpm test:int`                      | `TEST_DATABASE_URL` (a disposable server; tests create and drop their own databases) and `TEST_REDIS_URL`             | integration tests                                                                |
+| `pnpm test:acceptance`               | same                                                                                                                  | 500 tickers × 10 years, twice (~2–3 min)                                         |
+| `pnpm db:roundtrip`                  | same                                                                                                                  | every rollback script, plus the schema fingerprint check                         |
+| `pnpm db:codegen:check`              | same                                                                                                                  | generated types match the migrations                                             |
+| `pnpm --filter @market/web test:e2e` | a built web app (`pnpm --filter @market/web build`) and `E2E_DATABASE_URL` pointing at a database with synthetic data | Playwright journeys with axe checks (WCAG 2.2 AA, no serious or critical issues) |
 
 ## Migrations
 
@@ -122,6 +131,6 @@ Compare the field names and types with `packages/market-data/test/fixtures/tiing
 
 ## Secrets
 
-- Secrets live in the platform secret managers (Vercel, the worker host, Supabase vault).
-- Rotate quarterly and whenever staff change: `TIINGO_API_KEY`, `FRED_API_KEY`, `ADMIN_BASIC_AUTH_PASSWORD`, and database and Redis credentials.
+- Locally, secrets live only in the root `.env` (gitignored). A cloud deploy would use the platform secret managers.
+- Rotate yearly, or at once if exposed: `TIINGO_API_KEY`, `FRED_API_KEY`, `FINNHUB_API_KEY`, `RESEND_API_KEY`, the owner password (`OWNER_PASSWORD_HASH`), `SESSION_SECRET`, and database and Redis credentials.
 - The worker and web app read secrets only through `packages/config`, which redacts values from errors and logs.

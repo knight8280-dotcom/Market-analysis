@@ -66,7 +66,7 @@ Each entry: context, decision, alternatives rejected, consequences. Newest last.
   - Each test package's global setup builds a migrated template database, and each test file clones it with `CREATE DATABASE … TEMPLATE` in milliseconds.
 - **Alternatives rejected:** Testcontainers. It gives the same isolation but needs a Docker daemon, which the development sandbox lacks.
 
-## ADR-008: Basic auth for the Phase 0 admin page
+## ADR-008: Basic auth for the Phase 0 admin page (superseded by ADR-018)
 
 - **Decision:**
   - `apps/web/src/proxy.ts` (Next 16's renamed middleware, Node runtime) guards `/admin/*` with HTTP Basic auth from env.
@@ -156,3 +156,14 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
 - **Context:** Tiingo's free plan allows 500 unique symbols a month and 50 requests an hour, and its meta endpoint does not report the asset class.
 - **Decision:** the worker loads exactly the symbols in `config/universe.json` (65 today: 50 large caps and 15 ETFs), each with its asset class. Tiingo requests pass through hourly and daily Redis sliding windows (ADR-006's limiter, composed); jobs wait for a slot rather than fail. The synthetic provider ignores the file.
 - **Consequences:** adding a symbol is a one-line change plus `pnpm worker bootstrap` (idempotent). A larger universe needs a paid personal plan and the two limit variables.
+
+## ADR-018: Owner password login with a signed session cookie (supersedes ADR-008)
+
+- **Context:** Phase 1 turns the admin page into an app with personal-plan data on every page (ADR-015). It runs locally for one person; Supabase Auth is only needed for the optional cloud deploy.
+- **Decision:**
+  - One owner password, stored only as a scrypt hash (N = 2^17, r = 8, p = 1) in `OWNER_PASSWORD_HASH`; `pnpm web:hash-password` prints it. The format uses ":" separators because `.env` loaders expand "$".
+  - Sign-in is a Server Action (same-origin checked by Next). Success sets an httpOnly, SameSite=Lax cookie holding an HMAC-SHA256-signed token (14 days). The key is derived from `SESSION_SECRET` and the password hash, so changing either ends every session.
+  - `proxy.ts` guards every route except `/login` and `robots.txt`; pages and API routes check the session again (`requireOwner`, `ownerOr401`). Missing configuration fails closed (503).
+  - Only loopback host names (plus `WEB_ALLOWED_HOSTS`) are served, against DNS rebinding; `pnpm web` binds to 127.0.0.1.
+  - Failed sign-ins are throttled globally: 10 per 15 minutes.
+- **Consequences:** no user table, no password reset by email (re-run the hash command). A cloud deploy or a second user replaces this with Supabase Auth (Phase 1 group L), keeping the proxy and `requireOwner` call sites.

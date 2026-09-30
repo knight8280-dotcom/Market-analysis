@@ -1,6 +1,6 @@
 # Phase 1 Plan: Personal Analytics MVP
 
-**Status:** waiting for approval. No Phase 1 code has been written.
+**Status:** approved 2026-09-30; in progress (see Progress at the end).
 **Prepared:** 2026-09-30.
 **Scope sources:**
 
@@ -157,7 +157,8 @@ Nothing blocks starting. Each item has a default.
 
 Approved 2026-09-30 with the defaults (local only, Tiingo free key when provided, 65-symbol universe, SIC sectors, Finnhub and FRED optional, alert email via Resend, no cloud deploy).
 
-| Group | Status                                                                                                                                                                  |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A     | A1, A2, A3, A5 done. A4 (live Tiingo shape check) and the live part of A6 wait for the Tiingo key: `pnpm worker verify-tiingo`, then `pnpm worker bootstrap` (RUNBOOK). |
-| B–K   | not started                                                                                                                                                             |
+| Group | Status                                                                                                                                                                           |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A     | A1, A2, A3, A5 done. A4 (live Tiingo shape check) and the live part of A6 wait for the Tiingo key: `pnpm worker verify-tiingo`, then `pnpm worker bootstrap` (RUNBOOK).          |
+| B     | done: `packages/ui`, owner login (ADR-018), app shell with ⌘K search and "last updated", compliance labels and banners; Playwright + axe in CI. D1's ticker header came with it. |
+| C–K   | not started                                                                                                                                                                      |

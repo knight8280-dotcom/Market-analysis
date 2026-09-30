@@ -114,20 +114,40 @@ describe("loadWorkerEnv", () => {
 });
 
 describe("loadWebEnv", () => {
+  // Fake values in the right shape.
   const web = {
     APP_ENV: "local",
     DATABASE_URL: "postgres://localhost/market",
-    ADMIN_BASIC_AUTH_USER: "ops",
-    ADMIN_BASIC_AUTH_PASSWORD: "a-long-enough-password",
+    OWNER_PASSWORD_HASH: `scrypt:17:8:1:${"s".repeat(22)}:${"h".repeat(43)}`,
+    SESSION_SECRET: "x".repeat(32),
   };
 
-  it("parses a valid config", () => {
-    expect(loadWebEnv(web).ADMIN_BASIC_AUTH_USER).toBe("ops");
+  it("parses a valid config; extra hosts default to none", () => {
+    const env = loadWebEnv(web);
+    expect(env.OWNER_PASSWORD_HASH).toBe(web.OWNER_PASSWORD_HASH);
+    expect(env.WEB_ALLOWED_HOSTS).toEqual([]);
+    expect(loadWebEnv({ ...web, WEB_ALLOWED_HOSTS: " Box.local, " }).WEB_ALLOWED_HOSTS).toEqual([
+      "box.local",
+    ]);
   });
 
-  it("requires a strong admin password", () => {
-    const problems = problemsOf(() => loadWebEnv({ ...web, ADMIN_BASIC_AUTH_PASSWORD: "short" }));
-    expect(problems).toContain("ADMIN_BASIC_AUTH_PASSWORD must be at least 16 characters");
+  it("requires a password hash, not a password", () => {
+    const problems = problemsOf(() =>
+      loadWebEnv({ ...web, OWNER_PASSWORD_HASH: "hunter2hunter2" }),
+    );
+    expect(problems).toContain(
+      "OWNER_PASSWORD_HASH must be a hash printed by `pnpm web:hash-password`",
+    );
+    // A "$"-separated hash is refused: .env expansion would have corrupted it.
+    expect(() =>
+      loadWebEnv({ ...web, OWNER_PASSWORD_HASH: web.OWNER_PASSWORD_HASH.replaceAll(":", "$") }),
+    ).toThrow();
+  });
+
+  it("requires a long session secret and never echoes it", () => {
+    const problems = problemsOf(() => loadWebEnv({ ...web, SESSION_SECRET: "short-secret" }));
+    expect(problems.join("\n")).toContain("SESSION_SECRET must be at least 32 characters");
+    expect(problems.join("\n")).not.toContain("short-secret");
   });
 });
 

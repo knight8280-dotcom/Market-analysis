@@ -15,3 +15,5 @@ next-env.d.ts
 .data/
 *.log
 .DS_Store
+playwright-report/
+test-results/

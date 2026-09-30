@@ -1,0 +1,107 @@
+/*
+ * Design tokens (spec §6). Imported once by the app after `@import "tailwindcss"`.
+ * Every text color passes WCAG 2.2 AA (4.5:1) on background, surface and muted in its theme;
+ * checked with the WCAG relative-luminance formula when chosen.
+ * Themes: dark by default; light; or "system", which follows prefers-color-scheme.
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0d1117;
+  --surface: #151b23;
+  --muted: #212830;
+  --border: #3d444d;
+  --foreground: #f0f6fc;
+  --muted-foreground: #9198a1;
+  --primary: #4493f8;
+  --primary-solid: #1f6feb;
+  --primary-solid-foreground: #ffffff;
+  --up: #3fb950;
+  --down: #ff7b72;
+  --warning: #d29922;
+  --ring: #4493f8;
+  --banner-sample: #7a4b00;
+  --banner-stale: #8e1519;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --background: #ffffff;
+  --surface: #f6f8fa;
+  --muted: #eff2f5;
+  --border: #d1d9e0;
+  --foreground: #1f2328;
+  --muted-foreground: #59636e;
+  --primary: #0969da;
+  --primary-solid: #0969da;
+  --primary-solid-foreground: #ffffff;
+  --up: #1a7f37;
+  --down: #d1242f;
+  --warning: #9a6700;
+  --ring: #0969da;
+  --banner-sample: #7a4b00;
+  --banner-stale: #8e1519;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    color-scheme: light;
+    --background: #ffffff;
+    --surface: #f6f8fa;
+    --muted: #eff2f5;
+    --border: #d1d9e0;
+    --foreground: #1f2328;
+    --muted-foreground: #59636e;
+    --primary: #0969da;
+    --primary-solid: #0969da;
+    --primary-solid-foreground: #ffffff;
+    --up: #1a7f37;
+    --down: #d1242f;
+    --warning: #9a6700;
+    --ring: #0969da;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-solid: var(--primary-solid);
+  --color-primary-solid-foreground: var(--primary-solid-foreground);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-warning: var(--warning);
+  --color-ring: var(--ring);
+  --color-banner-sample: var(--banner-sample);
+  --color-banner-stale: var(--banner-stale);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    background: var(--background);
+    color: var(--foreground);
+  }
+  body {
+    /* Every figure lines up in columns (spec §6: tabular numbers for all figures). */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+  /* Visible focus for keyboard users (WCAG 2.4.7 / 2.4.13). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}

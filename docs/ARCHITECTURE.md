@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 0 (foundations and data layer). The standing spec is `/CLAUDE.md`; decisions and their reasons are in `DECISIONS.md`.
+Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec is `/CLAUDE.md`; decisions and their reasons are in `DECISIONS.md`.
 
 ## Topology
 
@@ -11,7 +11,7 @@ Status: Phase 0 (foundations and data layer). The standing spec is `/CLAUDE.md`;
   EDGAR,         │  Redis: queues, SEC rate limiter (shared by all processes), market-events pub/sub          │
   FRED)          └────────────────────────────────────────────────────────────────────────────────────────────┘
                  ┌──────────────── apps/web (Next.js 16) ─────────────────┐
- operator ──────►│ proxy.ts (Basic auth) ─► /admin/data-health ─► ops.*    │  (no provider calls from the browser, ever)
+ owner ─────────►│ proxy.ts (owner session) ─► pages + /api ─► market.*, ops.* │  (no provider calls from the browser, ever)
                  └─────────────────────────────────────────────────────────┘
 ```
 
@@ -27,9 +27,10 @@ Status: Phase 0 (foundations and data layer). The standing spec is `/CLAUDE.md`;
 | `packages/db`          | Kysely client (`@market/db`), migration runner and schema fingerprint (`/migrations`), security audit (`/security`), test databases (`/testing`), generated types                      |
 | `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                          |
 | `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine |
-| `packages/compliance`  | compliance copy registry, SAMPLE DATA banner                                                                                                                                           |
+| `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                |
+| `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                              |
 | `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, operator CLI                                                                                               |
-| `apps/web`             | internal data-health page (Phase 0 only)                                                                                                                                               |
+| `apps/web`             | Next.js app for the owner: login, Markets, ticker pages, data health; ⌘K search; server-side queries only                                                                              |
 
 Internal packages export TypeScript source. Vitest, tsx and Next.js (Turbopack) compile it directly, so there is no separate package build step.
 

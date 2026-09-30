@@ -14,9 +14,9 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "test:int": "vitest run --config vitest.int.config.ts",
-    "shim": "tsx scripts/shim.ts",
-    "migrate": "tsx scripts/migrate.ts",
-    "rollback": "tsx scripts/rollback.ts",
+    "shim": "tsx --env-file-if-exists=../../.env scripts/shim.ts",
+    "migrate": "tsx --env-file-if-exists=../../.env scripts/migrate.ts",
+    "rollback": "tsx --env-file-if-exists=../../.env scripts/rollback.ts",
     "roundtrip": "tsx scripts/roundtrip.ts",
     "codegen": "tsx scripts/codegen.ts",
     "codegen:check": "tsx scripts/codegen.ts --check"

@@ -24,8 +24,7 @@ export const SECRET_ENV_KEYS = [
   "TIINGO_API_KEY",
   "FINNHUB_API_KEY",
   "RESEND_API_KEY",
-  "ADMIN_BASIC_AUTH_PASSWORD",
-  "OWNER_PASSWORD",
+  "OWNER_PASSWORD_HASH",
   "SESSION_SECRET",
 ] as const;
 
@@ -119,10 +118,33 @@ export const workerEnvSchema = z
 
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;
 
+/**
+ * `scrypt:<log2 N>:<r>:<p>:<salt>:<hash>` (base64url), printed by `pnpm web:hash-password`.
+ * Colons, not "$": Next's .env loader expands "$NAME" and would corrupt a "$"-separated hash.
+ */
+export const PASSWORD_HASH_PATTERN =
+  /^scrypt:\d{2}:\d{1,2}:\d{1,2}:[A-Za-z0-9_-]{22,}:[A-Za-z0-9_-]{43,}$/;
+
 export const webEnvSchema = z.object({
   ...baseShape,
-  ADMIN_BASIC_AUTH_USER: z.string().min(1),
-  ADMIN_BASIC_AUTH_PASSWORD: z.string().min(16, "must be at least 16 characters"),
+  /** The owner's login password, hashed; the password itself is never stored. */
+  OWNER_PASSWORD_HASH: z
+    .string()
+    .regex(PASSWORD_HASH_PATTERN, "must be a hash printed by `pnpm web:hash-password`"),
+  /** Signs session cookies. Changing it signs the owner out everywhere. */
+  SESSION_SECRET: z
+    .string()
+    .min(32, "must be at least 32 characters (for example `openssl rand -base64 32`)"),
+  /** Host names the app answers to besides localhost, comma-separated (DNS-rebinding guard). */
+  WEB_ALLOWED_HOSTS: z
+    .string()
+    .optional()
+    .transform((v) =>
+      (v ?? "")
+        .split(",")
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean),
+    ),
 });
 
 export type WebEnv = z.infer<typeof webEnvSchema>;

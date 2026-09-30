@@ -1,24 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { BRAND } from "../brand";
+import { Providers } from "../components/providers";
+import { currentTheme } from "../server/theme";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Market Analysis (internal)",
-  // Phase 0 has no public pages.
+  title: { default: BRAND, template: `%s · ${BRAND}` },
+  // Personal use only (ADR-015): nothing here is for search engines.
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0d1117" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
+};
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const theme = await currentTheme();
   return (
-    <html lang="en">
-      <body
-        style={{
-          margin: 0,
-          fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
-          background: "#0f1115",
-          color: "#e8eaed",
-        }}
-      >
-        {children}
+    <html lang="en" data-theme={theme}>
+      <body className="min-h-dvh bg-background font-sans text-foreground">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

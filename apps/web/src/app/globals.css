@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "../../../../packages/ui/src/styles.css";
+
+/* Workspace packages live outside this app; Tailwind scans only the app by default. */
+@source "../../../../packages/ui/src";
+@source "../../../../packages/compliance/src";

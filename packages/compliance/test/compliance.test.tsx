@@ -1,0 +1,50 @@
+import { TooltipProvider } from "@market/ui/client";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { COPY, DisclaimerFooter, StaleDataBanner } from "../src";
+import { DataLabel } from "../src/client";
+
+const tiingo = {
+  name: "Tiingo",
+  attribution: "Data provided by Tiingo",
+  url: "https://www.tiingo.com",
+};
+
+describe("delay labels (spec §12)", () => {
+  it("uses the approved wording", () => {
+    expect(COPY.delay("eod", "2026-09-29")).toBe("End-of-day, as of Sep 29, 2026");
+    expect(COPY.delay("delayed")).toBe("Delayed 15 min");
+    expect(COPY.delay("realtime")).toBe("Real-time");
+    expect(COPY.delay("filing", "2025-10-31")).toBe("As filed, Oct 31, 2025");
+  });
+});
+
+describe("DataLabel", () => {
+  it("always shows the delay label and source, and is keyboard focusable", () => {
+    const html = renderToStaticMarkup(
+      <TooltipProvider>
+        <DataLabel source={tiingo} kind="eod" asOf="2026-09-29" fetchedAt={new Date()} />
+      </TooltipProvider>,
+    );
+    expect(html).toContain("End-of-day, as of Sep 29, 2026 · Source: Tiingo");
+    expect(html).toContain('tabindex="0"');
+  });
+});
+
+describe("StaleDataBanner", () => {
+  it("lists each stale dataset and renders nothing when all are fresh", () => {
+    const html = renderToStaticMarkup(
+      <StaleDataBanner items={[{ dataset: "daily_bars", since: "Sep 29, 2026, 6:30 PM ET" }]} />,
+    );
+    expect(html).toContain(COPY.staleDataBanner("daily_bars", "Sep 29, 2026, 6:30 PM ET"));
+    expect(renderToStaticMarkup(<StaleDataBanner items={[]} />)).toBe("");
+  });
+});
+
+describe("DisclaimerFooter", () => {
+  it("carries the §12 footer with the brand", () => {
+    const html = renderToStaticMarkup(<DisclaimerFooter brand="Market Analysis" />);
+    expect(html).toContain("Market Analysis provides financial data and analytics");
+    expect(html).toContain("Market Analysis is not a registered broker-dealer");
+  });
+});

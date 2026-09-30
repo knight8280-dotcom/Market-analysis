@@ -119,6 +119,23 @@ export class HttpClient {
     input: string | URL,
     init: { headers?: Record<string, string> } = {},
   ): Promise<unknown> {
+    const text = await this.getText(input, { ...init, accept: "application/json" });
+    try {
+      return JSON.parse(text) as unknown;
+    } catch (err) {
+      throw new ProviderResponseError(
+        this.provider,
+        `Response from ${this.redact(new URL(input))} is not valid JSON`,
+        err,
+      );
+    }
+  }
+
+  /** Same allowlist, limiter, retries and redaction as getJson, for HTML and XML documents. */
+  async getText(
+    input: string | URL,
+    init: { headers?: Record<string, string>; accept?: string } = {},
+  ): Promise<string> {
     const url = new URL(input);
     this.assertAllowed(url);
     const safeUrl = this.redact(url);
@@ -134,7 +151,7 @@ export class HttpClient {
           redirect: "error",
           signal: AbortSignal.timeout(this.opts.timeoutMs),
           headers: {
-            accept: "application/json",
+            accept: init.accept ?? "*/*",
             "accept-encoding": "gzip, deflate",
             ...this.opts.headers,
             ...init.headers,
@@ -170,18 +187,7 @@ export class HttpClient {
         attempt,
       });
 
-      if (response.ok) {
-        const text = await response.text();
-        try {
-          return JSON.parse(text) as unknown;
-        } catch (err) {
-          throw new ProviderResponseError(
-            this.provider,
-            `Response from ${safeUrl} is not valid JSON`,
-            err,
-          );
-        }
-      }
+      if (response.ok) return await response.text();
 
       // Drain the body so the connection can be reused.
       await response.body?.cancel();

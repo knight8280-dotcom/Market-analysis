@@ -3,6 +3,13 @@ import { loadWorkerEnv } from "@market/config";
 import { createDb, createPool } from "@market/db";
 import { ProviderId } from "@market/market-data";
 import { padCik, SecEdgarProvider } from "@market/market-data/adapters/sec-edgar";
+import {
+  checkAgainstReport,
+  findStatementReport,
+  parseFilingSummary,
+  parseStatementReport,
+} from "@market/market-data/edgar-report";
+import { STATEMENTS, type LineValue } from "@market/market-data/statements";
 import { TiingoProvider } from "@market/market-data/adapters/tiingo";
 import { Redis } from "ioredis";
 import type { JobRequest, WorkerContext } from "./context";
@@ -28,6 +35,8 @@ import { loadUniverse } from "./universe";
  *   reconcile --through YYYY-MM-DD [--days 5]
  *   recompute-adjustments
  *   edgar --tickers AAPL,MSFT | --ciks 320193,789019 [--facts-only]
+ *   statements [--ciks 320193,789019]   (default: every registrant with facts)
+ *   check-statements [--ciks ...]        (default: 10 large filers; live SEC requests)
  *   macro [--series DGS10,UNRATE]
  *   monitor [--at 2026-09-29T22:31:00Z]
  *   partitions
@@ -45,6 +54,20 @@ const list = (v: string | undefined) =>
         .map((s) => s.trim())
         .filter(Boolean)
     : undefined;
+/** Ten large filers across sectors for the statement check (plan step E4). */
+const CHECK_CIKS = [
+  "0000320193", // Apple
+  "0000789019", // Microsoft
+  "0001045810", // NVIDIA
+  "0000019617", // JPMorgan Chase
+  "0000093410", // Chevron
+  "0000104169", // Walmart
+  "0000200406", // Johnson & Johnson
+  "0000021344", // Coca-Cola
+  "0000080424", // Procter & Gamble
+  "0000354950", // Home Depot
+];
+
 const print = (value: unknown) => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 
 /** The same calendar date `years` earlier (29 February rolls to 1 March). */
@@ -304,6 +327,101 @@ async function main(): Promise<void> {
           httpStatusCounts: Object.fromEntries(edgar.http.statusCounts),
           seconds: (Date.now() - started) / 1000,
         });
+        break;
+      }
+
+      case "statements": {
+        const ciks =
+          list(flag("ciks"))?.map(padCik) ??
+          (
+            await db
+              .selectFrom("market.fundamentals_facts")
+              .select("cik")
+              .distinct()
+              .orderBy("cik")
+              .execute()
+          ).map((r) => r.cik);
+        const results = [];
+        for (const cik of ciks) results.push(await runJob(ctx, JOBS.buildStatements, { cik }));
+        print({ registrants: ciks.length, results, seconds: (Date.now() - started) / 1000 });
+        break;
+      }
+
+      // Plan step E4: our latest annual statements, as first reported, against SEC's own
+      // rendering of the same 10-K (the R pages), value by value.
+      case "check-statements": {
+        const edgar = ctx.providers.get("sec_edgar");
+        if (!(edgar instanceof SecEdgarProvider))
+          throw new Error("Set EDGAR_ENABLED=true, APP_NAME and SEC_CONTACT_EMAIL");
+        const ciks = list(flag("ciks"))?.map(padCik) ?? CHECK_CIKS;
+        const companies = [];
+        for (const cik of ciks) {
+          const latest = await db
+            .selectFrom("market.financial_statements")
+            .select(["period_end", "fiscal_year"])
+            .where("cik", "=", cik)
+            .where("statement", "=", "income")
+            .where("frequency", "=", "annual")
+            .where("basis", "=", "as_reported")
+            .orderBy("period_end", "desc")
+            .executeTakeFirst();
+          const filing = latest
+            ? await db
+                .selectFrom("market.filings")
+                .select("accession_no")
+                .where("cik", "=", cik)
+                .where("form_type", "=", "10-K")
+                .where("period", "=", latest.period_end)
+                .orderBy("filed_at")
+                .executeTakeFirst()
+            : undefined;
+          if (!latest || !filing) {
+            companies.push({ cik, error: "no annual statement or 10-K on file" });
+            continue;
+          }
+          const accession = filing.accession_no;
+          const reports = parseFilingSummary(
+            await edgar.getArchiveDocument({ cik, accession, file: "FilingSummary.xml" }),
+          );
+          const statements: Record<string, unknown> = {};
+          for (const def of STATEMENTS) {
+            const report = findStatementReport(reports, def.kind);
+            const row = await db
+              .selectFrom("market.financial_statements")
+              .select("line_items")
+              .where("cik", "=", cik)
+              .where("statement", "=", def.kind)
+              .where("frequency", "=", "annual")
+              .where("basis", "=", "as_reported")
+              .where("period_end", "=", latest.period_end)
+              .executeTakeFirst();
+            if (!report || !row) {
+              statements[def.kind] = {
+                error: !report ? "statement page not found" : "no statement",
+              };
+              continue;
+            }
+            const page = parseStatementReport(
+              await edgar.getArchiveDocument({ cik, accession, file: report.file }),
+            );
+            const results = checkAgainstReport(
+              row.line_items as unknown as Record<string, LineValue>,
+              def.lines,
+              page,
+              latest.period_end,
+            );
+            statements[def.kind] = {
+              page: `${report.file} ${report.shortName}`,
+              compared: results.filter((r) => r.status !== "not_presented").length,
+              matched: results.filter((r) => r.status === "match").length,
+              matchedNegated: results.filter((r) => r.status === "match_negated").length,
+              mismatches: results.filter((r) => r.status === "mismatch"),
+              notPresented: results.filter((r) => r.status === "not_presented").map((r) => r.line),
+            };
+          }
+          companies.push({ cik, fiscalYear: latest.fiscal_year, accession, statements });
+        }
+        print({ companies, httpStatusCounts: Object.fromEntries(edgar.http.statusCounts) });
         break;
       }
 

@@ -1,4 +1,5 @@
 import type { FundamentalFact } from "@market/market-data";
+import { buildStatements } from "@market/market-data/statements";
 import {
   padCik,
   SecEdgarProvider,
@@ -15,6 +16,7 @@ import { insertFacts, insertFilings } from "../repo/edgar";
 import { recordIssues, type IssueRow } from "../repo/quality";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
 import { applyEdgarEntity, securitiesMissingCik, setCik } from "../repo/securities";
+import { replaceStatements, statementFacts } from "../repo/statements";
 import { resolveSource, withProviderHealth } from "../routing";
 
 export const CikInput = z.object({ cik: z.string().regex(/^\d{1,10}$/) });
@@ -84,6 +86,14 @@ export async function ingestFundamentals(ctx: WorkerContext, raw: unknown) {
     counts.rows_inserted = await insertFacts(ctx.db, keep);
     counts.rows_unchanged += keep.length - counts.rows_inserted;
     await recordIssues(ctx.db, issues);
+    // New facts change the statements built from them.
+    if (counts.rows_inserted > 0) {
+      await ctx.dispatch.dispatch({
+        name: JOBS.buildStatements,
+        data: { cik },
+        jobId: jobId(JOBS.buildStatements, padCik(cik), runId),
+      });
+    }
     await finishRun(ctx.db, runId, {
       status: "succeeded",
       counts,
@@ -161,6 +171,45 @@ export async function ingestFilings(ctx: WorkerContext, raw: unknown) {
       status: "failed",
       counts,
       httpStatusCounts: statusDelta(provider, before),
+      error: err instanceof Error ? err.message : String(err),
+      at: ctx.clock(),
+    });
+    throw err;
+  }
+}
+
+/**
+ * Rebuilds a registrant's financial statements from its stored facts (Phase 1 step E). Pure
+ * computation over our own data: no provider call.
+ */
+export async function buildStatementsJob(ctx: WorkerContext, raw: unknown) {
+  const cik = padCik(CikInput.parse(raw).cik);
+  const runId = await startRun(ctx.db, {
+    jobName: JOBS.buildStatements,
+    jobId: ctx.jobId,
+    dataset: "fundamentals",
+    source: "sec_edgar",
+    params: { cik },
+    at: ctx.clock(),
+  });
+  const counts = emptyCounts();
+  try {
+    const facts = await statementFacts(ctx.db, cik);
+    counts.rows_fetched = facts.length;
+    const rows = buildStatements(facts);
+    counts.rows_inserted = await replaceStatements(ctx.db, cik, rows, "sec_edgar", ctx.clock());
+    await finishRun(ctx.db, runId, { status: "succeeded", counts, at: ctx.clock() });
+    return {
+      runId,
+      cik,
+      facts: facts.length,
+      statements: rows.length,
+      restated: rows.filter((r) => r.restated && r.basis === "latest").length,
+    };
+  } catch (err) {
+    await finishRun(ctx.db, runId, {
+      status: "failed",
+      counts,
       error: err instanceof Error ? err.message : String(err),
       at: ctx.clock(),
     });

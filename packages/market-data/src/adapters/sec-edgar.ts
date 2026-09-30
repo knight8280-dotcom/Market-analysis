@@ -306,6 +306,17 @@ export class SecEdgarProvider extends BaseProvider {
     return facts;
   }
 
+  /** A document in a filing's EDGAR archive folder, e.g. FilingSummary.xml or R3.htm. */
+  async getArchiveDocument(req: { cik: string; accession: string; file: string }): Promise<string> {
+    if (!/^[A-Za-z0-9._-]+$/.test(req.file))
+      throw new TypeError(`Bad archive file name: ${req.file}`);
+    if (!/^\d{10}-\d{2}-\d{6}$/.test(req.accession)) {
+      throw new TypeError(`Bad accession number: ${req.accession}`);
+    }
+    const folder = `${Number(padCik(req.cik))}/${req.accession.replaceAll("-", "")}`;
+    return this.http.getText(`${this.wwwBase}/Archives/edgar/data/${folder}/${req.file}`);
+  }
+
   override async healthCheck(): Promise<void> {
     await this.http.getJson(`${this.dataBase}/submissions/CIK${this.probeCik}.json`);
   }

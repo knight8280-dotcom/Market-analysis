@@ -1,6 +1,12 @@
 import type { WorkerContext } from "../context";
 import type { JobName } from "../queues";
-import { attachEdgarIds, ingestFilings, ingestFundamentals, scheduleEdgar } from "./edgar";
+import {
+  attachEdgarIds,
+  buildStatementsJob,
+  ingestFilings,
+  ingestFundamentals,
+  scheduleEdgar,
+} from "./edgar";
 import { ensurePartitions } from "./ensure-partitions";
 import { ingestEod, reconcileEod, scheduleEod } from "./ingest-eod";
 import { ingestMacro } from "./ingest-macro";
@@ -18,6 +24,7 @@ export const HANDLERS: Readonly<Record<JobName, Handler>> = {
   "reconcile-eod": reconcileEod,
   "recompute-adjustments": recomputeAdjustments,
   "ingest-fundamentals": ingestFundamentals,
+  "build-statements": buildStatementsJob,
   "ingest-filings": ingestFilings,
   "schedule-edgar": (ctx) => scheduleEdgar(ctx),
   "attach-edgar-ids": (ctx) => attachEdgarIds(ctx),

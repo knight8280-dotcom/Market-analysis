@@ -44,6 +44,7 @@ Research behind these rows: `docs/BRIEF.md`.
   - `https://www.sec.gov/files/company_tickers_exchange.json`
   - `https://data.sec.gov/submissions/CIK##########.json` (recent filings only; older pages and `submissions.zip` are the Phase 1 bulk path). The same response gives the registrant's SIC code, which sets `sic_code`, `industry` and `sector` (ADR-016).
   - `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
+  - `https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/FilingSummary.xml` and its `R<n>.htm` statement pages, only for the statement check (`pnpm worker check-statements`, ADR-020)
 - **Fixtures:**
   - hand-built cases with made-up values (registrant CIK 0000000042);
   - trimmed **live recordings** from 2026-09-30 (`test/fixtures/sec-edgar/recorded/`): Apple submissions and companyfacts, a numeric-string CIK (ExxonMobil Holdings Corp) and `fy: 0`/`fp: ""` facts (Wells Fargo). SEC data is public domain, so recordings may be committed.

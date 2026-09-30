@@ -78,6 +78,24 @@ export interface MarketFilings {
   url: string;
 }
 
+export interface MarketFinancialStatements {
+  basis: string;
+  built_at: Generated<Timestamp>;
+  cik: string;
+  fiscal_period: string;
+  fiscal_year: number;
+  frequency: string;
+  /**
+   * Map of line id to {value (decimal string), concept, unit, accession, filed, derived?}.
+   */
+  line_items: Json;
+  period_end: string;
+  period_start: string | null;
+  restated: Generated<boolean>;
+  source: string;
+  statement: string;
+}
+
 export interface MarketFundamentalsFacts {
   accession_no: string;
   cik: string;
@@ -281,6 +299,7 @@ export interface DB {
   "market.corporate_actions": MarketCorporateActions;
   "market.data_providers": MarketDataProviders;
   "market.filings": MarketFilings;
+  "market.financial_statements": MarketFinancialStatements;
   "market.fundamentals_facts": MarketFundamentalsFacts;
   "market.macro_observations": MarketMacroObservations;
   "market.macro_series": MarketMacroSeries;

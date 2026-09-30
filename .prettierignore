@@ -9,3 +9,7 @@ docs/BRIEF.md
 CLAUDE.md
 supabase/migrations
 supabase/rollbacks
+
+# Verbatim recordings of provider responses
+**/fixtures/**/recorded/**/*.htm
+**/fixtures/**/recorded/**/*.xml

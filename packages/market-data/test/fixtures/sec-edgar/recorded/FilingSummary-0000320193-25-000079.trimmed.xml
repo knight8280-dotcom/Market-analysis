@@ -1,0 +1,82 @@
+<?xml version='1.0' encoding='utf-8'?>
+<FilingSummary>
+  <Version>3.25.3</Version>
+  <ProcessingTime/>
+  <ReportFormat>html</ReportFormat>
+  <ContextCount>182</ContextCount>
+  <ElementCount>384</ElementCount>
+  <EntityCount>1</EntityCount>
+  <FootnotesReported>false</FootnotesReported>
+  <SegmentCount>69</SegmentCount>
+  <ScenarioCount>0</ScenarioCount>
+  <TuplesReported>false</TuplesReported>
+  <UnitCount>7</UnitCount>
+  <MyReports>
+    <Report instance="aapl-20250927.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R1.htm</HtmlFileName>
+      <LongName>0000001 - Document - Cover Page</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.apple.com/role/CoverPage</Role>
+      <ShortName>Cover Page</ShortName>
+      <MenuCategory>Cover</MenuCategory>
+      <Position>1</Position>
+    </Report>
+<Report instance="aapl-20250927.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R3.htm</HtmlFileName>
+      <LongName>9952151 - Statement - CONSOLIDATED STATEMENTS OF OPERATIONS</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.apple.com/role/CONSOLIDATEDSTATEMENTSOFOPERATIONS</Role>
+      <ShortName>CONSOLIDATED STATEMENTS OF OPERATIONS</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>3</Position>
+    </Report>
+<Report instance="aapl-20250927.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R4.htm</HtmlFileName>
+      <LongName>9952152 - Statement - CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.apple.com/role/CONSOLIDATEDSTATEMENTSOFCOMPREHENSIVEINCOME</Role>
+      <ShortName>CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>4</Position>
+    </Report>
+<Report instance="aapl-20250927.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R5.htm</HtmlFileName>
+      <LongName>9952153 - Statement - CONSOLIDATED BALANCE SHEETS</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.apple.com/role/CONSOLIDATEDBALANCESHEETS</Role>
+      <ShortName>CONSOLIDATED BALANCE SHEETS</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>5</Position>
+    </Report>
+<Report instance="aapl-20250927.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R6.htm</HtmlFileName>
+      <LongName>9952154 - Statement - CONSOLIDATED BALANCE SHEETS (Parenthetical)</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.apple.com/role/CONSOLIDATEDBALANCESHEETSParenthetical</Role>
+      <ShortName>CONSOLIDATED BALANCE SHEETS (Parenthetical)</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>6</Position>
+    </Report>
+<Report instance="aapl-20250927.htm">
+      <IsDefault>false</IsDefault>
+      <HasEmbeddedReports>false</HasEmbeddedReports>
+      <HtmlFileName>R8.htm</HtmlFileName>
+      <LongName>9952156 - Statement - CONSOLIDATED STATEMENTS OF CASH FLOWS</LongName>
+      <ReportType>Sheet</ReportType>
+      <Role>http://www.apple.com/role/CONSOLIDATEDSTATEMENTSOFCASHFLOWS</Role>
+      <ShortName>CONSOLIDATED STATEMENTS OF CASH FLOWS</ShortName>
+      <MenuCategory>Statements</MenuCategory>
+      <Position>8</Position>
+    </Report>
+  </MyReports>
+</FilingSummary>

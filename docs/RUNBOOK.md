@@ -119,6 +119,11 @@ The merge only inserts or corrects, so overlapping ranges are safe.
 3. Pass when the output's `httpStatusCounts` has no `403` or `429`, and `ops.data_ingestion_runs` shows 50 succeeded `fundamentals` runs.
 4. Afterwards, compare one `acceptanceDateTime` with the filing index page's "Accepted" time (`DATA_SOURCES.md`), and replace the hand-built fixtures with trimmed recordings. SEC data is public domain, so recordings may be committed.
 
+## Financial statements
+
+- Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.
+- **Check them against SEC's rendering** (live, 4 requests per company, needs `EDGAR_ENABLED=true`): `pnpm worker check-statements [--ciks …]`. Pass when every statement reports `mismatches: []`. `notPresented` lists values that come from the notes rather than the statement face; they are not errors. Last run: 2026-09-30, 10 companies, 301 values, 0 mismatches.
+
 ## Recording vendor fixtures (Tiingo and other commercial vendors)
 
 **Never commit commercial vendor responses.** Use a personal key locally:

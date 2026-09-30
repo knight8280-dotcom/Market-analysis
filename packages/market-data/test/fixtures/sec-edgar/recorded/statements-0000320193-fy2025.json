@@ -1,0 +1,191 @@
+{
+  "note": "Apple FY2025 (period ending 2025-09-27) values as first reported, from SEC companyfacts (public domain), as built by buildStatements.",
+  "statements": {
+    "balance": {
+      "accountsPayable": {
+        "concept": "us-gaap:AccountsPayableCurrent",
+        "unit": "USD",
+        "value": "69860000000"
+      },
+      "cash": {
+        "concept": "us-gaap:CashAndCashEquivalentsAtCarryingValue",
+        "unit": "USD",
+        "value": "35934000000"
+      },
+      "currentAssets": {
+        "concept": "us-gaap:AssetsCurrent",
+        "unit": "USD",
+        "value": "147957000000"
+      },
+      "currentLiabilities": {
+        "concept": "us-gaap:LiabilitiesCurrent",
+        "unit": "USD",
+        "value": "165631000000"
+      },
+      "equity": {
+        "concept": "us-gaap:StockholdersEquity",
+        "unit": "USD",
+        "value": "73733000000"
+      },
+      "inventory": {
+        "concept": "us-gaap:InventoryNet",
+        "unit": "USD",
+        "value": "5718000000"
+      },
+      "liabilitiesAndEquity": {
+        "concept": "us-gaap:LiabilitiesAndStockholdersEquity",
+        "unit": "USD",
+        "value": "359241000000"
+      },
+      "longTermDebt": {
+        "concept": "us-gaap:LongTermDebtNoncurrent",
+        "unit": "USD",
+        "value": "78328000000"
+      },
+      "ppe": {
+        "concept": "us-gaap:PropertyPlantAndEquipmentNet",
+        "unit": "USD",
+        "value": "49834000000"
+      },
+      "receivables": {
+        "concept": "us-gaap:AccountsReceivableNetCurrent",
+        "unit": "USD",
+        "value": "39777000000"
+      },
+      "sharesOutstanding": {
+        "concept": "us-gaap:CommonStockSharesOutstanding",
+        "unit": "shares",
+        "value": "14773260000"
+      },
+      "shortTermInvestments": {
+        "concept": "us-gaap:MarketableSecuritiesCurrent",
+        "unit": "USD",
+        "value": "18763000000"
+      },
+      "totalAssets": {
+        "concept": "us-gaap:Assets",
+        "unit": "USD",
+        "value": "359241000000"
+      },
+      "totalLiabilities": {
+        "concept": "us-gaap:Liabilities",
+        "unit": "USD",
+        "value": "285508000000"
+      }
+    },
+    "cashflow": {
+      "buybacks": {
+        "concept": "us-gaap:PaymentsForRepurchaseOfCommonStock",
+        "unit": "USD",
+        "value": "90711000000"
+      },
+      "capex": {
+        "concept": "us-gaap:PaymentsToAcquirePropertyPlantAndEquipment",
+        "unit": "USD",
+        "value": "12715000000"
+      },
+      "depreciation": {
+        "concept": "us-gaap:DepreciationDepletionAndAmortization",
+        "unit": "USD",
+        "value": "11698000000"
+      },
+      "dividendsPaid": {
+        "concept": "us-gaap:PaymentsOfDividends",
+        "unit": "USD",
+        "value": "15421000000"
+      },
+      "financingCashFlow": {
+        "concept": "us-gaap:NetCashProvidedByUsedInFinancingActivities",
+        "unit": "USD",
+        "value": "-120686000000"
+      },
+      "investingCashFlow": {
+        "concept": "us-gaap:NetCashProvidedByUsedInInvestingActivities",
+        "unit": "USD",
+        "value": "15195000000"
+      },
+      "operatingCashFlow": {
+        "concept": "us-gaap:NetCashProvidedByUsedInOperatingActivities",
+        "unit": "USD",
+        "value": "111482000000"
+      },
+      "stockCompensation": {
+        "concept": "us-gaap:ShareBasedCompensation",
+        "unit": "USD",
+        "value": "12863000000"
+      }
+    },
+    "income": {
+      "costOfRevenue": {
+        "concept": "us-gaap:CostOfGoodsAndServicesSold",
+        "unit": "USD",
+        "value": "220960000000"
+      },
+      "epsBasic": {
+        "concept": "us-gaap:EarningsPerShareBasic",
+        "unit": "USD/shares",
+        "value": "7.49"
+      },
+      "epsDiluted": {
+        "concept": "us-gaap:EarningsPerShareDiluted",
+        "unit": "USD/shares",
+        "value": "7.46"
+      },
+      "grossProfit": {
+        "concept": "us-gaap:GrossProfit",
+        "unit": "USD",
+        "value": "195201000000"
+      },
+      "incomeTax": {
+        "concept": "us-gaap:IncomeTaxExpenseBenefit",
+        "unit": "USD",
+        "value": "20719000000"
+      },
+      "netIncome": {
+        "concept": "us-gaap:NetIncomeLoss",
+        "unit": "USD",
+        "value": "112010000000"
+      },
+      "operatingExpenses": {
+        "concept": "us-gaap:OperatingExpenses",
+        "unit": "USD",
+        "value": "62151000000"
+      },
+      "operatingIncome": {
+        "concept": "us-gaap:OperatingIncomeLoss",
+        "unit": "USD",
+        "value": "133050000000"
+      },
+      "pretaxIncome": {
+        "concept": "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+        "unit": "USD",
+        "value": "132729000000"
+      },
+      "researchAndDevelopment": {
+        "concept": "us-gaap:ResearchAndDevelopmentExpense",
+        "unit": "USD",
+        "value": "34550000000"
+      },
+      "revenue": {
+        "concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+        "unit": "USD",
+        "value": "416161000000"
+      },
+      "sellingGeneralAdministrative": {
+        "concept": "us-gaap:SellingGeneralAndAdministrativeExpense",
+        "unit": "USD",
+        "value": "27601000000"
+      },
+      "sharesBasic": {
+        "concept": "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic",
+        "unit": "shares",
+        "value": "14948500000"
+      },
+      "sharesDiluted": {
+        "concept": "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding",
+        "unit": "shares",
+        "value": "15004697000"
+      }
+    }
+  }
+}

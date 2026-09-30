@@ -10,7 +10,9 @@
     "./adapters/sec-edgar": "./src/adapters/sec-edgar.ts",
     "./adapters/fred": "./src/adapters/fred.ts",
     "./adapters/tiingo": "./src/adapters/tiingo.ts",
-    "./adapters/synthetic": "./src/adapters/synthetic.ts"
+    "./adapters/synthetic": "./src/adapters/synthetic.ts",
+    "./statements": "./src/statements.ts",
+    "./edgar-report": "./src/edgar-report.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

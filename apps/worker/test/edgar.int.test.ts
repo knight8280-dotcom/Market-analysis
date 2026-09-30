@@ -161,8 +161,9 @@ describe("attach-edgar-ids", () => {
   });
 
   it("sets SIC code, industry and sector from submissions, then loads filings and facts", async () => {
-    // Runs the two queued filings jobs and the companyfacts jobs they queue.
-    expect(await h.drain()).toEqual({ ran: 4, failed: 0 });
+    // The two queued filings jobs, the companyfacts jobs they queue, and the statement builds
+    // those queue.
+    expect(await h.drain()).toEqual({ ran: 6, failed: 0 });
 
     expect(await security("AAPL")).toEqual({
       cik: "0000320193",
@@ -175,12 +176,23 @@ describe("attach-edgar-ids", () => {
 
     const runs = await h.t.db
       .selectFrom("ops.data_ingestion_runs")
-      .select(["dataset", "status"])
+      .select(["job_name", "status"])
       .where("dataset", "in", ["filings", "fundamentals"])
       .execute();
     expect(runs.filter((r) => r.status !== "succeeded")).toEqual([]);
-    expect(runs.filter((r) => r.dataset === "filings")).toHaveLength(2);
-    expect(runs.filter((r) => r.dataset === "fundamentals")).toHaveLength(2);
+    const count = (job: string) => runs.filter((r) => r.job_name === job).length;
+    expect([
+      count("ingest-filings"),
+      count("ingest-fundamentals"),
+      count("build-statements"),
+    ]).toEqual([2, 2, 2]);
+    // The CIK 42 fixture has a full 10-Q period, so it yields statements.
+    const built = await h.t.db
+      .selectFrom("market.financial_statements")
+      .select((eb) => eb.fn.countAll<string>().as("n"))
+      .where("cik", "=", "0000000042")
+      .executeTakeFirstOrThrow();
+    expect(Number(built.n)).toBeGreaterThan(0);
     const facts = await h.t.db
       .selectFrom("market.fundamentals_facts")
       .select((eb) => eb.fn.countAll<string>().as("n"))

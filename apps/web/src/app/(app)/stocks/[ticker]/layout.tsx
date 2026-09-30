@@ -1,7 +1,9 @@
 import { DataLabel } from "@market/compliance/client";
 import { loadWebEnv } from "@market/config";
 import { Badge, Delta, formatDate, formatPrice } from "@market/ui";
+import { Bell } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { StockTabs } from "../../../../components/stock-tabs";
@@ -62,8 +64,15 @@ export default async function StockLayout({
             ) : null}
           </div>
           <p className="mt-1 text-muted-foreground">{security.name}</p>
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <WatchlistMenu securityId={security.securityId} ticker={security.ticker} />
+            <Link
+              href={`/alerts?ticker=${encodeURIComponent(security.ticker)}`}
+              className="flex min-h-8 items-center gap-1 rounded-md border px-2.5 text-sm hover:bg-muted"
+            >
+              <Bell aria-hidden className="size-3.5" />
+              Alert
+            </Link>
           </div>
           {security.sector ? (
             <p className="mt-1 text-xs text-muted-foreground">

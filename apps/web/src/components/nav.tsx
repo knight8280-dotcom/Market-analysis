@@ -3,6 +3,7 @@
 import { cn } from "@market/ui";
 import {
   Activity,
+  Bell,
   CalendarDays,
   Filter,
   Grid2x2,
@@ -20,6 +21,7 @@ export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/watchlists", label: "Watchlists", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/heatmap", label: "Heatmap", icon: Grid2x2 },
+  { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/admin/data-health", label: "Data health", icon: Activity },
 ];
 

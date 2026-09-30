@@ -50,6 +50,9 @@ describe("calendar-driven schedule", () => {
     // 18:44 / 18:45 EDT: the screener snapshot waits for the 18:30 end-of-day deadline.
     expect(ids("2026-09-30T22:44:00Z", cfg)).not.toContain("refresh-screener/2026-09-30");
     expect(ids("2026-09-30T22:45:00Z", cfg)).toContain("refresh-screener/2026-09-30");
+    // 18:50 EDT: alerts, once the day's bars and snapshot are in.
+    expect(ids("2026-09-30T22:49:00Z", cfg)).not.toContain("evaluate-alerts/2026-09-30");
+    expect(ids("2026-09-30T22:50:00Z", cfg)).toContain("evaluate-alerts/2026-09-30");
     // 21:00 EDT: macro and the off-peak EDGAR sweep.
     const evening = ids("2026-10-01T01:00:00Z", cfg);
     expect(evening).toContain("ingest-macro/2026-09-30/DGS10");

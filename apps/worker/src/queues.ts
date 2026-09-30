@@ -29,6 +29,7 @@ export const JOBS = {
   refreshScreener: "refresh-screener",
   ingestEarnings: "ingest-earnings",
   ingestReleases: "ingest-releases",
+  evaluateAlerts: "evaluate-alerts",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -49,6 +50,7 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "refresh-screener": QUEUES.maintenance,
   "ingest-earnings": QUEUES.macro,
   "ingest-releases": QUEUES.macro,
+  "evaluate-alerts": QUEUES.maintenance,
 };
 
 /**

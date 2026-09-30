@@ -1,4 +1,5 @@
 import type { WorkerContext } from "../context";
+import { evaluateAlerts } from "./alerts";
 import type { JobName } from "../queues";
 import {
   attachEdgarIds,
@@ -36,6 +37,7 @@ export const HANDLERS: Readonly<Record<JobName, Handler>> = {
   "refresh-screener": (ctx) => refreshScreener(ctx),
   "ingest-earnings": ingestEarnings,
   "ingest-releases": ingestReleases,
+  "evaluate-alerts": evaluateAlerts,
 };
 
 export function runJob(ctx: WorkerContext, name: JobName, data: unknown): Promise<unknown> {

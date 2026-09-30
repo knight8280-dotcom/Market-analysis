@@ -69,6 +69,10 @@ export const workerEnvSchema = z
     /** Where alert emails go: the owner's address (personal use only). */
     ALERT_EMAIL_TO: z.email().optional(),
     ALERT_EMAIL_FROM: z.string().min(3).default("Market Analysis <onboarding@resend.dev>"),
+    /** Emails per day across all alerts; further events are recorded as suppressed. */
+    ALERT_DAILY_CAP: z.coerce.number().int().min(0).max(1000).default(20),
+    /** Resend's API; tests point this at a local capture server. */
+    RESEND_API_URL: z.url().default("https://api.resend.com"),
   })
   .superRefine((env, ctx) => {
     const providers = [env.DATA_PROVIDER_PRIMARY, env.DATA_PROVIDER_FALLBACK];

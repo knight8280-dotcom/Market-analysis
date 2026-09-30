@@ -22,6 +22,8 @@ export interface ScheduleConfig {
   screenerAt: string;
   /** Earnings and economic calendars, refreshed before the open. */
   calendarsAt: string;
+  /** Alert evaluation, after the end-of-day deadline and the screener. */
+  alertsAt: string;
   reconcileDays: number;
   edgarEnabled: boolean;
   earningsEnabled: boolean;
@@ -37,6 +39,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   edgarAt: "21:00",
   screenerAt: "18:45",
   calendarsAt: "06:30",
+  alertsAt: "18:50",
   reconcileDays: 5,
   edgarEnabled: false,
   earningsEnabled: false,
@@ -104,6 +107,9 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
   }
   if (etMinutes >= minutesOfDay(cfg.screenerAt)) {
     jobs.push({ name: JOBS.refreshScreener, data: {}, jobId: jobId(JOBS.refreshScreener, today) });
+  }
+  if (etMinutes >= minutesOfDay(cfg.alertsAt)) {
+    jobs.push({ name: JOBS.evaluateAlerts, data: {}, jobId: jobId(JOBS.evaluateAlerts, today) });
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.edgarAt)) {
     jobs.push({ name: JOBS.scheduleEdgar, data: {}, jobId: jobId(JOBS.scheduleEdgar, today) });

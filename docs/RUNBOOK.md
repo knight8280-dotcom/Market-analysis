@@ -138,6 +138,13 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **.ics export:** "Download .ics" on each calendar tab, signed in. It is a download, not a subscription link, so nothing is reachable without the owner's session; re-import after a refresh (event ids are stable, so calendar apps update rather than duplicate).
 - **Heatmap** (`/heatmap`) reads the screener snapshot (`pnpm worker screener` rebuilds it). Tiles are sized by market cap (SEC shares outstanding × close); securities without shares outstanding are left out and counted, and when none has a market cap (synthetic data) the map sizes by 30-day dollar volume instead.
 
+## Alerts
+
+- The worker evaluates alerts at 18:50 ET; to run now: `pnpm worker alerts` (prints what fired and what was emailed). Re-running is safe: nothing fires twice for the same bar.
+- **Email setup** (optional; without it events are listed on `/alerts` as "Not emailed"): create a free Resend account with your own address, create an API key, and set `RESEND_API_KEY` and `ALERT_EMAIL_TO` (that same address) in `.env`. The default sender, `onboarding@resend.dev`, delivers only to the account's own address, which is all personal use needs. `ALERT_DAILY_CAP` (default 20) limits emails per day; the rest are recorded as suppressed.
+- **A failed email** (status "Failed" with Resend's error) is retried by the job's own retries; if it keeps failing, check the key and address, then run `pnpm worker alerts` again. Failed events older than a day are not retried.
+- To check delivery end to end without Resend, point `RESEND_API_URL` at a local capture server (the E2E test does this).
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

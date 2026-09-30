@@ -196,3 +196,13 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Saved screens live in `public.saved_screens` (migration 10), per user, under RLS.
 - **Measured:** p95 10.9 ms over 47 screens at 6,000 synthetic securities (budget 1 s).
 - **Consequences:** results are as fresh as the last snapshot (shown with its as-of date). Presets are filters, not recommendations (spec §13). Migration order changed from the plan: 10 is now the per-user tables (needed for saved screens), 11 the earnings and economic calendars.
+
+## ADR-022: Alerts on end-of-day crossings, fired once, delivered separately
+
+- **Context:** alerts must fire at most once per crossing (plan I2), never flood the owner's inbox, and survive retries and email outages without duplicates. Data is end-of-day only (ADR-015), so intraday triggers are out of scope.
+- **Decision:**
+  - Conditions (`@market/alerts`, shared by worker and web): close crosses above or below a level (the previous close at or on the other side of it, split-adjusted to the latest bar's basis); one-day move of at least N% up, down or either (split-adjusted); an earnings date within the next N days (Finnhub). Definitions are validated JSON in `public.alerts.params`.
+  - `evaluate-alerts` runs at 18:50 ET (after the 18:30 end-of-day deadline and the screener) against the latest bar of the active price route. An event is unique per (alert, bar date), or per (alert, report date) for earnings, so a re-run fires nothing new. A per-alert cooldown (default 24 h) holds new crossings after a fire.
+  - Firing and delivery are separate. Events start `pending`; delivery marks them `sent`, `failed` or `suppressed` (no email settings, a user other than the owner, or over `ALERT_DAILY_CAP`, default 20 per day). Failed sends make the job fail so the queue retries; Resend's `Idempotency-Key` (`alert-event-<id>`) stops a retry from sending a second copy.
+  - Email goes only to `ALERT_EMAIL_TO`, the owner's own address, in plain text, with the data's as-of date and source, a SAMPLE DATA marker on synthetic data, and "not investment advice".
+- **Consequences:** a price that gaps across a level between two runs still fires once (on the first bar past it). A day the worker misses is not re-evaluated; the next run looks at the latest bar only. Every event is listed on `/alerts` whether or not it was emailed.

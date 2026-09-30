@@ -9,6 +9,7 @@ import type {
   RoutingTable,
 } from "@market/market-data";
 import type { Logger } from "./log";
+import type { Mailer } from "./mail";
 import type { JobName } from "./queues";
 import type { Universe } from "./universe";
 
@@ -52,6 +53,17 @@ export interface WorkerContext {
   jobId?: string;
   /** Configured symbols for quota-limited vendors (config/universe.json). */
   universe?: Universe;
+  /** Alert email delivery; without it alert events are recorded but not emailed. */
+  alertDelivery?: AlertDelivery;
+}
+
+export interface AlertDelivery {
+  mailer: Mailer | null;
+  /** The owner's address (ALERT_EMAIL_TO); null when not configured. */
+  to: string | null;
+  from: string;
+  /** Emails per exchange-calendar day across all alerts. */
+  dailyCap: number;
 }
 
 export type DatasetKey = Dataset;

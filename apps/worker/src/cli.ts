@@ -17,6 +17,7 @@ import { InlineDispatcher } from "./dispatch";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { runJob } from "./jobs/index";
 import { createLogger } from "./log";
+import { alertDeliveryFromEnv } from "./mail";
 import { buildProviders, routingFromEnv } from "./providers";
 import { JOBS, jobId } from "./queues";
 import { mappingsFor } from "./repo/securities";
@@ -40,6 +41,7 @@ import { loadUniverse } from "./universe";
  *   screener
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
+ *   alerts [--through YYYY-MM-DD]        (emails need RESEND_API_KEY and ALERT_EMAIL_TO)
  *   macro [--series DGS10,UNRATE]
  *   monitor [--at 2026-09-29T22:31:00Z]
  *   partitions
@@ -87,7 +89,7 @@ async function main(): Promise<void> {
   const db = createDb(pool);
   // Quota-limited vendors share Redis rate limiters with the running worker.
   const limiterRedis =
-    env.EDGAR_ENABLED || env.TIINGO_API_KEY
+    env.EDGAR_ENABLED || env.TIINGO_API_KEY || env.FINNHUB_API_KEY
       ? new Redis(env.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
       : undefined;
   const at = flag("at");
@@ -104,6 +106,7 @@ async function main(): Promise<void> {
     events: { emit: (event) => log.info({ event }, "event") },
     dispatch: dispatcher,
     universe,
+    alertDelivery: alertDeliveryFromEnv(env),
   };
   const source = flag("source") ? ProviderId.parse(flag("source")) : undefined;
   const failures: { job: string; error: string }[] = [];
@@ -430,6 +433,16 @@ async function main(): Promise<void> {
 
       case "screener":
         print(await runJob(ctx, JOBS.refreshScreener, {}));
+        break;
+
+      case "alerts":
+        print(
+          await runJob(
+            ctx,
+            JOBS.evaluateAlerts,
+            flag("through") ? { through: flag("through") } : {},
+          ),
+        );
         break;
 
       case "earnings":

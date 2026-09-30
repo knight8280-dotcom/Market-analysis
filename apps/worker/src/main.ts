@@ -4,6 +4,7 @@ import { Redis } from "ioredis";
 import type { EventSink } from "./context";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { createLogger } from "./log";
+import { alertDeliveryFromEnv } from "./mail";
 import { buildProviders, routingFromEnv } from "./providers";
 import { QUEUES } from "./queues";
 import { startRuntime } from "./runtime";
@@ -42,6 +43,7 @@ async function main(): Promise<void> {
       log,
       events,
       universe,
+      alertDelivery: alertDeliveryFromEnv(env),
     },
     { connection: () => new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }) },
   );

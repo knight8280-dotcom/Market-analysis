@@ -34,12 +34,16 @@ describe("SEC EDGAR helpers", () => {
     expect(() => secUserAgent(" ", "admin@example.com")).toThrow();
   });
 
-  it("reads acceptanceDateTime as Eastern wall-clock time", () => {
-    // 06:01:36 EDT is 10:01:36 UTC.
-    expect(acceptanceTime("2025-08-01T06:01:36.000Z", "2025-08-01").toISOString()).toBe(
-      "2025-08-01T10:01:36.000Z",
+  it("reads acceptanceDateTime as UTC (verified against the filing index page)", () => {
+    // Index page: "Accepted 2025-10-31 06:01:26" (EDT) == 10:01:26 UTC.
+    expect(acceptanceTime("2025-10-31T10:01:26.000Z", "2025-10-31").toISOString()).toBe(
+      "2025-10-31T10:01:26.000Z",
     );
+    // Missing or malformed: midnight Eastern on the filing date.
     expect(acceptanceTime("", "2025-02-14").toISOString()).toBe("2025-02-14T05:00:00.000Z");
+    expect(acceptanceTime("2025-02-14 10:00", "2025-02-14").toISOString()).toBe(
+      "2025-02-14T05:00:00.000Z",
+    );
   });
 });
 
@@ -174,5 +178,68 @@ describe("SecEdgarProvider", () => {
     await expect(
       p.getDailyBars({ symbol: "X", start: "2024-01-02", end: "2024-01-03" }),
     ).rejects.toThrow(/does not support/);
+  });
+});
+
+describe("SecEdgarProvider against recorded live responses (Apple, 2026-09-30)", () => {
+  const recorded = {
+    "/submissions/CIK0000320193.json": "sec-edgar/recorded/submissions-CIK0000320193.trimmed.json",
+    "/api/xbrl/companyfacts/CIK0000320193.json":
+      "sec-edgar/recorded/companyfacts-CIK0000320193.trimmed.json",
+  };
+
+  it("parses real submissions, with acceptance times in UTC", async () => {
+    const { p } = provider(recorded);
+    const filings = await p.getFilings({ cik: "320193" });
+    expect(filings).toHaveLength(6);
+    const tenK = filings.find((f) => f.accession_no === "0000320193-25-000079")!;
+    // The filing index page says "Accepted 2025-10-31 06:01:26" (Eastern).
+    expect(tenK).toMatchObject({ form_type: "10-K", filing_date: "2025-10-31", cik: "0000320193" });
+    expect(tenK.filed_at.toISOString()).toBe("2025-10-31T10:01:26.000Z");
+    expect(tenK.url).toMatch(
+      /^https:\/\/sec\.test\/Archives\/edgar\/data\/320193\/000032019325000079\/.+\.htm$/,
+    );
+  });
+
+  it("parses real companyfacts", async () => {
+    const { p } = provider(recorded);
+    const facts = await p.getFundamentals({ cik: "320193" });
+    expect(facts).toHaveLength(12);
+    expect(new Set(facts.map((f) => f.unit))).toEqual(new Set(["shares", "USD", "USD/shares"]));
+    for (const f of facts) {
+      expect(f.cik).toBe("0000320193");
+      expect(f.accession_no).toMatch(/^\d{10}-\d{2}-\d{6}$/);
+    }
+  });
+});
+
+describe("SecEdgarProvider against recorded edge cases (2026-09-30)", () => {
+  it("accepts a companyfacts CIK sent as a string (ExxonMobil Holdings Corp)", async () => {
+    const { p } = provider({
+      "/api/xbrl/companyfacts/CIK0002115436.json":
+        "sec-edgar/recorded/companyfacts-CIK0002115436.trimmed.json",
+    });
+    const facts = await p.getFundamentals({ cik: "2115436" });
+    expect(facts.length).toBeGreaterThan(0);
+    expect(facts.every((f) => f.cik === "0002115436")).toBe(true);
+  });
+
+  it("stores fy 0 / fp '' as no fiscal period (Wells Fargo 8-K exhibit facts)", async () => {
+    const { p } = provider({
+      "/api/xbrl/companyfacts/CIK0000072971.json":
+        "sec-edgar/recorded/companyfacts-CIK0000072971.trimmed.json",
+    });
+    const facts = await p.getFundamentals({ cik: "72971" });
+    const exhibit = facts.find((f) => f.taxonomy !== "us-gaap")!;
+    expect(exhibit).toMatchObject({ fiscal_year: null, fiscal_period: null });
+    const assets = facts.find((f) => f.concept === "Assets")!;
+    expect(assets.fiscal_year).toBeGreaterThan(2000);
+  });
+
+  it("rejects a companyfacts file that names a different CIK", async () => {
+    const { p } = provider({
+      "/api/xbrl/companyfacts/CIK0000000043.json": "sec-edgar/companyfacts-CIK0000000042.json",
+    });
+    await expect(p.getFundamentals({ cik: "43" })).rejects.toThrow(/names CIK 42/);
   });
 });

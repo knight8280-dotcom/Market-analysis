@@ -33,30 +33,33 @@ export async function insertFacts(
   return inserted;
 }
 
-/** Inserts filings not seen before and returns them (filings are immutable once accepted). */
+/**
+ * Inserts filings not seen before and returns them. Filings are immutable once accepted, but
+ * our parsed metadata can change when a parser is fixed, so differing rows are updated in place
+ * (without counting as new filings).
+ */
 export async function insertFilings(
   db: Database,
   filings: readonly FilingRecord[],
 ): Promise<FilingRecord[]> {
   const inserted: FilingRecord[] = [];
   for (const f of filings) {
-    const result = await db
-      .insertInto("market.filings")
-      .values({
-        accession_no: f.accession_no,
-        cik: f.cik,
-        form_type: f.form_type,
-        filed_at: f.filed_at,
-        filing_date: f.filing_date,
-        period: f.period,
-        primary_document: f.primary_document,
-        items: f.items,
-        url: f.url,
-        source: f.source,
-      })
-      .onConflict((oc) => oc.columns(["accession_no", "cik"]).doNothing())
-      .executeTakeFirst();
-    if (Number(result.numInsertedOrUpdatedRows ?? 0) > 0) inserted.push(f);
+    const result = await sql<{ inserted: boolean }>`
+      insert into market.filings
+        (accession_no, cik, form_type, filed_at, filing_date, period, primary_document, items, url, source)
+      values (${f.accession_no}, ${f.cik}, ${f.form_type}, ${f.filed_at}, ${f.filing_date}, ${f.period},
+              ${f.primary_document}, ${f.items}::text[], ${f.url}, ${f.source})
+      on conflict (accession_no, cik) do update
+        set form_type = excluded.form_type, filed_at = excluded.filed_at, filing_date = excluded.filing_date,
+            period = excluded.period, primary_document = excluded.primary_document, items = excluded.items,
+            url = excluded.url
+        where (market.filings.form_type, market.filings.filed_at, market.filings.filing_date, market.filings.period,
+               market.filings.primary_document, market.filings.items, market.filings.url)
+          is distinct from (excluded.form_type, excluded.filed_at, excluded.filing_date, excluded.period,
+                            excluded.primary_document, excluded.items, excluded.url)
+      returning (xmax = 0) as inserted
+    `.execute(db);
+    if (result.rows[0]?.inserted === true) inserted.push(f);
   }
   return inserted;
 }

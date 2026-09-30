@@ -1,0 +1,66 @@
+{
+  "cik": "2115436",
+  "entityName": "ExxonMobil Holdings Corp",
+  "facts": {
+    "ffd": {
+      "NetFeeAmt": {
+        "label": "",
+        "description": "",
+        "units": {
+          "USD": [
+            {
+              "end": "2026-06-23",
+              "val": 0,
+              "accn": "0001193125-26-292453",
+              "fy": null,
+              "fp": null,
+              "form": "POSASR",
+              "filed": "2026-07-01",
+              "frame": "CY2026Q2I"
+            }
+          ]
+        }
+      }
+    },
+    "dei": {
+      "EntityCommonStockSharesOutstanding": {
+        "label": "Entity Common Stock, Shares Outstanding",
+        "description": "Indicate number of shares or other units outstanding of each of registrant's classes of capital or common stock or other ownership interests, if and as stated on cover of related periodic report. Where multiple classes or units exist define each class/interest by adding class of stock items such as Common Class A [Member], Common Class B [Member] or Partnership Interest [Member] onto the Instrument [Domain] of the Entity Listings, Instrument.",
+        "units": {
+          "shares": [
+            {
+              "end": "2026-06-30",
+              "val": 4111911960,
+              "accn": "0000034088-26-000093",
+              "fy": 2026,
+              "fp": "Q2",
+              "form": "10-Q",
+              "filed": "2026-08-03",
+              "frame": "CY2026Q2I"
+            }
+          ]
+        }
+      }
+    },
+    "us-gaap": {
+      "AccountsPayableAndAccruedLiabilitiesCurrent": {
+        "label": "Accounts Payable and Accrued Liabilities, Current",
+        "description": "Sum of the carrying values as of the balance sheet date of obligations incurred through that date and due within one year (or the operating cycle, if longer), including liabilities incurred (and for which invoices have typically been received) and payable to vendors for goods and services received, taxes, interest, rent and utilities, accrued salaries and bonuses, payroll taxes and fringe benefits.",
+        "units": {
+          "USD": [
+            {
+              "end": "2025-12-31",
+              "val": 60911000000,
+              "accn": "0000034088-26-000093",
+              "fy": 2026,
+              "fp": "Q2",
+              "form": "10-Q",
+              "filed": "2026-08-03",
+              "frame": "CY2025Q4I"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

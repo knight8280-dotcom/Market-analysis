@@ -1,0 +1,47 @@
+{
+  "cik": 72971,
+  "entityName": "WELLS        FARGO & COMPANY/MN",
+  "facts": {
+    "invest": {
+      "InvestmentWarrantsExercisePrice": {
+        "label": "Investment Warrants, Exercise Price",
+        "description": "Exercise price of the warrants.",
+        "units": {
+          "USD": [
+            {
+              "start": "2017-01-01",
+              "end": "2017-12-31",
+              "val": 33.701,
+              "accn": "0000072971-19-000225",
+              "fy": 0,
+              "fp": "",
+              "form": "8-K",
+              "filed": "2019-02-26",
+              "frame": "CY2017"
+            }
+          ]
+        }
+      }
+    },
+    "us-gaap": {
+      "Assets": {
+        "label": "Assets",
+        "description": "Sum of the carrying amounts as of the balance sheet date of all assets that are recognized. Assets are probable future economic benefits obtained or controlled by an entity as a result of past transactions or events.",
+        "units": {
+          "USD": [
+            {
+              "end": "2026-06-30",
+              "val": 2282201000000,
+              "accn": "0000072971-26-000302",
+              "fy": 2026,
+              "fp": "Q2",
+              "form": "10-Q",
+              "filed": "2026-07-28",
+              "frame": "CY2026Q2I"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

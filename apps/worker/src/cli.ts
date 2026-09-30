@@ -175,16 +175,58 @@ async function main(): Promise<void> {
           });
         }
         if (!ciks?.length) throw new Error("edgar needs --tickers or --ciks");
-        const perCompany: unknown[] = [];
-        for (const cik of [...new Set(ciks)]) {
-          if (!process.argv.includes("--facts-only"))
-            await runJob(ctx, JOBS.ingestFilings, { cik });
-          perCompany.push(await runJob(ctx, JOBS.ingestFundamentals, { cik }));
+        const unique = [...new Set(ciks)];
+        // Filings first: each registrant with new 10-K/10-Q filings gets one companyfacts job.
+        if (!process.argv.includes("--facts-only")) {
+          for (const cik of unique) await runJob(ctx, JOBS.ingestFilings, { cik });
+          await drain();
         }
-        await drain();
+        // Registrants without a queued refresh (no new periodic filings) get one explicitly.
+        const done = new Set(
+          (
+            await db
+              .selectFrom("ops.data_ingestion_runs")
+              .select("params")
+              .where("job_name", "=", JOBS.ingestFundamentals)
+              .where("started_at", ">=", new Date(started))
+              .execute()
+          ).map((r) => padCik(String((r.params as { cik?: string }).cik ?? ""))),
+        );
+        for (const cik of unique) {
+          if (!done.has(cik)) await runJob(ctx, JOBS.ingestFundamentals, { cik });
+        }
+        const runs = await db
+          .selectFrom("ops.data_ingestion_runs")
+          .select([
+            "dataset",
+            "status",
+            "params",
+            "rows_fetched",
+            "rows_inserted",
+            "rows_rejected",
+            "error",
+          ])
+          .where("dataset", "in", ["fundamentals", "filings"])
+          .where("started_at", ">=", new Date(started))
+          .orderBy("run_id")
+          .execute();
+        const summarize = (dataset: string) => {
+          const rs = runs.filter((r) => r.dataset === dataset);
+          return {
+            runs: rs.length,
+            succeeded: rs.filter((r) => r.status === "succeeded").length,
+            failed: rs
+              .filter((r) => r.status === "failed")
+              .map((r) => ({ params: r.params, error: r.error })),
+            rowsFetched: rs.reduce((n, r) => n + r.rows_fetched, 0),
+            rowsInserted: rs.reduce((n, r) => n + r.rows_inserted, 0),
+            rowsRejected: rs.reduce((n, r) => n + r.rows_rejected, 0),
+          };
+        };
         print({
-          companies: perCompany.length,
-          perCompany,
+          companies: unique.length,
+          filings: summarize("filings"),
+          fundamentals: summarize("fundamentals"),
           // The acceptance criterion: no 403 or 429 from SEC during the whole run.
           httpStatusCounts: Object.fromEntries(edgar.http.statusCounts),
           seconds: (Date.now() - started) / 1000,

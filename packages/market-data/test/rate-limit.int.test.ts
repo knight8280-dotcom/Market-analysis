@@ -49,6 +49,17 @@ describe("RedisSlidingWindowLimiter", () => {
     expect(grants.length).toBeLessThanOrEqual(56);
   });
 
+  it("works on a connection that is still opening (fresh process)", async () => {
+    const fresh = connect();
+    expect(fresh.status).not.toBe("ready");
+    const limiter = new RedisSlidingWindowLimiter(fresh, {
+      key: `test:fresh:${randomUUID()}`,
+      limit: 8,
+      windowMs: 1000,
+    });
+    await expect(limiter.acquire()).resolves.toBeGreaterThan(0);
+  });
+
   it("fails closed when Redis is unreachable, so no request is sent", async () => {
     const dead = connect("redis://127.0.0.1:1");
     const limiter = new RedisSlidingWindowLimiter(dead, {

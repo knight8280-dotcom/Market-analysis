@@ -38,6 +38,8 @@ export interface SlidingWindowOptions {
   windowMs: number;
   /** Give up after waiting this long in total (default 60s). */
   maxWaitMs?: number;
+  /** How long to wait for a connection that is still opening (default 2s). */
+  connectTimeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -52,13 +54,41 @@ export class RedisSlidingWindowLimiter {
     this.redis = redis;
     this.opts = {
       maxWaitMs: 60_000,
+      connectTimeoutMs: 2_000,
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       ...opts,
     };
   }
 
+  /**
+   * With the offline queue disabled, a command sent while the connection is still opening fails
+   * at once. Wait briefly for "ready" so a freshly started process is not treated as an outage.
+   */
+  private async ensureReady(): Promise<void> {
+    const status = this.redis.status;
+    if (status === "ready") return;
+    if (status === "end" || status === "close") {
+      throw new RateLimiterUnavailableError(
+        `Rate limiter ${this.opts.key}: Redis connection is closed`,
+      );
+    }
+    if (status === "wait") void this.redis.connect().catch(() => {});
+    await new Promise<void>((resolve, reject) => {
+      const onReady = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        this.redis.off("ready", onReady);
+        reject(new RateLimiterUnavailableError(`Rate limiter ${this.opts.key}: Redis not ready`));
+      }, this.opts.connectTimeoutMs);
+      this.redis.once("ready", onReady);
+    });
+  }
+
   /** Resolves with the Redis server time (ms) at which the slot was granted. */
   async acquire(): Promise<number> {
+    await this.ensureReady();
     let waited = 0;
     for (;;) {
       let result: unknown;

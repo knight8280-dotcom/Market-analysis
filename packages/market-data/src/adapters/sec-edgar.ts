@@ -81,7 +81,8 @@ const FactPayload = z.object({
 });
 
 const CompanyFactsPayload = z.object({
-  cik: z.number().int(),
+  // Usually a number; some newer registrants' files send a numeric string ("2115436").
+  cik: z.union([z.number().int(), z.string().regex(/^\d{1,10}$/)]),
   entityName: z.string(),
   facts: z.record(
     z.string(),
@@ -139,6 +140,8 @@ export class SecEdgarProvider extends BaseProvider {
       // SEC signals throttling with 403 as well as 429 (spec §2.3: back off on 429/403/503).
       retryStatuses: [403, 429, 500, 502, 503, 504],
       baseDelayMs: 1000,
+      // companyfacts for a large filer is several MB.
+      timeoutMs: 60_000,
       rateLimiter: opts.rateLimiter,
       fetch: opts.fetch,
       sleep: opts.sleep,
@@ -233,6 +236,9 @@ export class SecEdgarProvider extends BaseProvider {
     const fetchedAt = this.now();
     const raw = await this.http.getJson(`${this.dataBase}/api/xbrl/companyfacts/CIK${cik}.json`);
     const payload = parseVendor(this.id, CompanyFactsPayload, raw, "companyfacts");
+    if (padCik(payload.cik) !== cik) {
+      throw new ProviderResponseError(this.id, `companyfacts for ${cik} names CIK ${payload.cik}`);
+    }
     const facts: FundamentalFact[] = [];
     for (const [taxonomy, concepts] of Object.entries(payload.facts)) {
       for (const [concept, { units }] of Object.entries(concepts)) {
@@ -255,8 +261,9 @@ export class SecEdgarProvider extends BaseProvider {
                   value: f.val,
                   period_start: f.start ?? null,
                   period_end: f.end,
-                  fiscal_year: f.fy ?? null,
-                  fiscal_period: f.fp ?? null,
+                  // Some facts (e.g. 8-K exhibits) carry fy 0 and fp "": no fiscal period.
+                  fiscal_year: f.fy ? f.fy : null,
+                  fiscal_period: f.fp ? f.fp : null,
                   form: f.form,
                   filed_at: f.filed,
                   accession_no: f.accn,
@@ -278,15 +285,14 @@ export class SecEdgarProvider extends BaseProvider {
 }
 
 /**
- * EDGAR's acceptanceDateTime looks like "2024-11-01T06:01:36.000Z", but the wall-clock time
- * appears to be Eastern even though it carries "Z". Reading it as Eastern makes a filing public
- * 4-5 hours later than the UTC reading, which is the conservative direction for point-in-time
- * use (it can never create look-ahead). Unverified against a live response; see DATA_SOURCES.md.
- * Falls back to 00:00 ET on the filing date.
+ * EDGAR's acceptanceDateTime (e.g. "2025-10-31T10:01:26.000Z") is true UTC: verified on
+ * 2026-09-30 against the filing index page, which showed "Accepted 2025-10-31 06:01:26"
+ * (Eastern, UTC-4). Falls back to 00:00 ET on the filing date when missing or malformed.
  */
 export function acceptanceTime(value: string, filingDate: string): Date {
-  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(value);
-  if (!m) return zonedTimeToUtc(filingDate, "00:00");
-  const minute = zonedTimeToUtc(m[1]!, `${m[2]}:${m[3]}`);
-  return new Date(minute.getTime() + Number(m[4]) * 1000);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value)) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return zonedTimeToUtc(filingDate, "00:00");
 }

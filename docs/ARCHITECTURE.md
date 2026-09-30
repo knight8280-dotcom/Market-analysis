@@ -1,0 +1,158 @@
+# Architecture
+
+Status: Phase 0 (foundations and data layer). The standing spec is `/CLAUDE.md`; decisions and their reasons are in `DECISIONS.md`.
+
+## Topology
+
+```
+                 ┌──────────────────────────── apps/worker (Node, long-running) ─────────────────────────────┐
+ vendors         │  scheduler tick (30s, market calendar) ──► BullMQ queues ──► job handlers ──► Postgres     │
+ (Tiingo,  ◄─────┤  HttpClient (allowlist, backoff) ◄─ adapters ◄─ provider routing/failover                  │
+  EDGAR,         │  Redis: queues, SEC rate limiter (shared by all processes), market-events pub/sub          │
+  FRED)          └────────────────────────────────────────────────────────────────────────────────────────────┘
+                 ┌──────────────── apps/web (Next.js 16) ─────────────────┐
+ operator ──────►│ proxy.ts (Basic auth) ─► /admin/data-health ─► ops.*    │  (no provider calls from the browser, ever)
+                 └─────────────────────────────────────────────────────────┘
+```
+
+- **Postgres (Supabase, Postgres 17)** is the system of record. Local development and CI use stock `postgres:17` with a test-only shim for Supabase's roles.
+- **Redis** backs BullMQ, the SEC rate limiter and the `market-events` pub/sub channel. Phase 1 uses that channel for cache invalidation and SSE fan-out.
+- Browsers never talk to a data provider (MUST-NOT #4). All provider access is in the worker; the web app reads only our database.
+
+## Packages
+
+| Package                | Role                                                                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/config`      | zod-validated env (`loadWorkerEnv`, `loadWebEnv`), secret redaction, production guards                                                                                                 |
+| `packages/db`          | Kysely client (`@market/db`), migration runner and schema fingerprint (`/migrations`), security audit (`/security`), test databases (`/testing`), generated types                      |
+| `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                          |
+| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine |
+| `packages/compliance`  | compliance copy registry, SAMPLE DATA banner                                                                                                                                           |
+| `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, operator CLI                                                                                               |
+| `apps/web`             | internal data-health page (Phase 0 only)                                                                                                                                               |
+
+Internal packages export TypeScript source. Vitest, tsx and Next.js (Turbopack) compile it directly, so there is no separate package build step.
+
+## Database
+
+Migrations live in `supabase/migrations` (forward-only). Each has a rollback in `supabase/rollbacks`, and CI proves every rollback restores an identical schema (`pnpm db:roundtrip`).
+
+### Schemas
+
+| Schema   | Contents                                                                                                                                                                                                                                                       | Access               |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `market` | `data_providers`, `securities`, `security_symbol_history`, `provider_symbols`, `prices_daily` (+ partitions), `corporate_actions`, `adjustment_factors`, `prices_daily_adjusted` (view), `fundamentals_facts`, `filings`, `macro_series`, `macro_observations` | server/worker only   |
+| `ops`    | `data_ingestion_runs`, `data_corrections`, `data_quality_issues`, `provider_health`, `dataset_routing`, `alerts`                                                                                                                                               | server/worker only   |
+| `public` | empty in Phase 0; user-owned tables arrive in Phase 1 with per-user RLS policies                                                                                                                                                                               | client roles via RLS |
+
+`market` and `ops` are not in Supabase's API-exposed schema list, and client roles (`anon`, `authenticated`) have no `USAGE` on them. Every table, including every partition, has RLS enabled. `auditDatabaseSecurity()` checks all of this in CI and fails on any table without RLS, any client grant on a private schema, and any function a client role could execute.
+
+### Securities master
+
+- `security_id` is a stable internal id, independent of ticker.
+- `security_symbol_history` records exchange tickers over time. An exclusion constraint stops one ticker from belonging to two securities at the same moment; reuse after a delisting is allowed.
+- `provider_symbols` maps each vendor's spelling to a security, with validity ranges. Ingestion attributes every bar to a security by its date through these ranges, so a reused ticker's old history stays with the old security.
+- Delisted securities are never deleted.
+
+### Daily prices
+
+`market.prices_daily` stores **raw** bars, range-partitioned by year:
+
+- one partition for pre-2000;
+- yearly partitions 2000–2028, extended by `market.ensure_prices_daily_partition(year)` from the `ensure-partitions` job;
+- a `DEFAULT` partition that should stay empty, which the monitor alerts on.
+
+The primary key is `(security_id, date, source)`; it also serves `(security_id, date DESC)` lookups through backward index scans. CHECK constraints (positive prices, `low <= open,close <= high`, `volume >= 0`) back up the ingest validator.
+
+### Adjusted prices
+
+Raw prints are never overwritten.
+
+- `market.adjustment_factors` is a sparse step function. Row `(security, e)` holds the cumulative factors of every corporate action with `ex_date >= e`.
+- `market.prices_daily_adjusted` (a `security_invoker` view) multiplies each raw bar by the row with the smallest `ex_date` after the bar's date. Volume is divided by the split factor.
+- Splits and stock dividends with ratio _r_ (new shares per old) contribute `1/r`.
+- A cash dividend _D_ contributes `1 − D / C`, where _C_ is the raw close on the previous trading day, converted to post-split units if a split shares the ex-date.
+- A missing _C_, or _D ≥ C_, is reported as a data-quality issue rather than estimated.
+- Spin-offs and mergers are stored but not price-adjusted (known issue; needs the distributed entity's value).
+- `recompute-adjustments` rebuilds a security's factors whenever its actions change, then emits `adjustments_recomputed`. That event is the cache-invalidation hook.
+
+### Fundamentals and filings
+
+- `fundamentals_facts` holds XBRL facts keyed by CIK, not `security_id`, because one registrant can list several share classes. Joins go through `securities.cik`.
+- Every filing's copy of a fact is kept (unique on accession, taxonomy, concept, unit and period, `NULLS NOT DISTINCT`), so backtests can use point-in-time `filed_at`.
+- `filings` is keyed by `(accession_no, cik)`, because co-registrants share accession numbers.
+
+## Data flow
+
+### Ingestion (`ingest-eod`, one vendor symbol and date range)
+
+1. Resolve the provider: an explicit override (backfills), or the dataset's active route.
+2. Fetch bars and corporate actions. Provider health records latency and success or failure, and failures count toward failover.
+3. Map each bar to a security by date through `provider_symbols`. Unmapped bars are refused and recorded (`unmapped_symbol`).
+4. Upsert corporate actions. New or changed actions queue `recompute-adjustments`.
+5. Validate with `validateDailyBars`:
+   - **rejected:** non-positive prices, inconsistent OHLC, negative or fractional volume, conflicting duplicates;
+   - **collapsed:** identical duplicates;
+   - **flagged but kept:** a move of more than 50% with no action on file, or a bar on a day the calendar says was closed.
+6. Merge in one transaction. New bars are inserted and identical bars are left alone, so re-running changes nothing. Bars the vendor changed are updated, and their old and new values go to `ops.data_corrections`.
+7. Record an `ops.data_ingestion_runs` row: counts, HTTP status counts for this run, and any error.
+
+`reconcile-eod` re-ingests the last 5 trading days nightly, so late and corrected prints land through the same merge.
+
+### Jobs and schedules
+
+| Queue                 | Jobs                                                                         |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod` |
+| `ingest-fundamentals` | `ingest-fundamentals`                                                        |
+| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out)                                 |
+| `ingest-macro`        | `ingest-macro`                                                               |
+| `maintenance`         | `recompute-adjustments`, `ensure-partitions`                                 |
+| `monitor`             | `staleness-monitor`                                                          |
+| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                          |
+
+`dueJobs(now)` is a pure function of the market calendar:
+
+| When (exchange time)                                                    | Job                    |
+| ----------------------------------------------------------------------- | ---------------------- |
+| every minute                                                            | staleness monitor      |
+| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out            |
+| 02:00                                                                   | reconcile              |
+| 03:00                                                                   | partitions             |
+| 18:00                                                                   | macro                  |
+| 21:00                                                                   | EDGAR sweep (off-peak) |
+
+Job ids are deterministic (`ingest-eod/2026-09-29/TEST_S001`), so re-dispatching is a no-op. Jobs retry 5 times with exponential backoff and jitter. Non-retryable provider errors (404, bad shape, license) become `UnrecoverableError`, and exhausted jobs go to the dead-letter queue.
+
+### Freshness and failover
+
+| Dataset              | SLO                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| daily_bars           | bars for the latest session due by 18:30 ET for ≥ 98% of securities listed that day |
+| fundamentals         | XBRL facts for any 10-K/10-Q filed 24h–7d ago                                       |
+| macro                | every series refreshed within 26h                                                   |
+| prices_daily_default | empty                                                                               |
+
+The monitor opens a `staleness` alert on a breach and resolves it on recovery. Routing decisions are pure functions in `packages/market-data/src/routing.ts`, persisted in `ops.dataset_routing`:
+
+- **Failover** after 3 consecutive primary failures, or on a staleness breach **if a fallback exists**. It emits `provider_failover` and opens a `failover` alert. After a staleness failover the monitor immediately asks the fallback for the missing session. With no fallback, repeated failures route to "none": jobs fail fast, and readers serve last-good data with a staleness banner.
+- **Failback** after 3 consecutive healthy probes of the primary, counted from the failover. It emits `provider_failback`.
+- Bars keep their `source`, so a chart series that crosses a failover can mark the boundary (spec §2.1).
+
+### SEC EDGAR access
+
+- Every request declares `User-Agent: <APP_NAME> <SEC_CONTACT_EMAIL>`.
+- Requests wait for a slot in a Redis sliding-window limiter (at most 8 grants in any 1-second window, across all processes, using Redis server time). If Redis is unreachable, no request is sent (fail closed).
+- 403, 429 and 5xx responses are retried with backoff.
+- New 10-K/10-Q filings trigger a companyfacts refresh for that CIK.
+
+## Licensing controls in code
+
+- `DATA_LICENSES` (`packages/market-data/src/licenses.ts`) states per provider whether data may be displayed, which datasets, the intraday delay, export rights and attribution. Uncontracted commercial providers cannot be displayed.
+- `enforceDelay()` drops intraday prints newer than now − delay for non-entitled users.
+- Every record carries `source`, `source_symbol`, `fetched_at`, `as_of` and `license_tier`.
+- The env schema refuses the synthetic provider in production; the SAMPLE DATA banner shows wherever synthetic data exists.
+
+## Deferred beyond Phase 0
+
+Intraday storage (`prices_intraday_1m`, pg_partman), `financial_statements`, insiders/13F/news/earnings, all user, billing and AI tables, least-privilege database roles for web and worker, a nonce-based CSP, OpenTelemetry/Sentry, deployment and IaC.

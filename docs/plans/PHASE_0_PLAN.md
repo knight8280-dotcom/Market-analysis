@@ -1,6 +1,6 @@
 # Phase 0 Plan: Foundations and Data Layer
 
-**Status:** waiting for approval. No feature code has been written. The only files so far are this plan, `/CLAUDE.md` (the standing spec) and `docs/BRIEF.md`.
+**Status:** approved 2026-09-30 (all defaults) and implemented. Results and every departure from this plan: [`PHASE_0_REPORT.md`](PHASE_0_REPORT.md).
 **Scope source:** Phase 0 prompt in `docs/BRIEF.md` (Part C). **Rules source:** `/CLAUDE.md`.
 **Prepared:** 2026-09-30
 

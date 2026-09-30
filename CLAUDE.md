@@ -3,7 +3,8 @@
 This file is the project's standing specification: Part B ("Master Build Prompt") of the original build brief, reproduced verbatim below. Phase instructions arrive separately. **Phase instructions govern scope; this document governs rules.**
 
 - Full original brief (licensing research, variables, phase prompts, checklists, provider comparison, risk register, sources): [`docs/BRIEF.md`](docs/BRIEF.md)
-- Current phase: **Phase 0: Foundations and Data Layer.** The plan is waiting for approval: [`docs/plans/PHASE_0_PLAN.md`](docs/plans/PHASE_0_PLAN.md)
+- Current phase: **Phase 0 complete (2026-09-30).** Report: [`docs/plans/PHASE_0_REPORT.md`](docs/plans/PHASE_0_REPORT.md). The Phase 1 plan draft at the end of that report is waiting for approval.
+- Project docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md), [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/RUNBOOK.md`](docs/RUNBOOK.md), [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 
 ## Resolved variables (Part A)
 

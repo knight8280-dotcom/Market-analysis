@@ -36,7 +36,7 @@ test("owner signs in, finds a ticker with the palette and sees labelled prices",
   await page.keyboard.type("TEST_DIV");
   await expect(dialog.getByRole("option").first()).toContainText("TEST_DIV");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/stocks\/TEST_DIV$/);
+  await expect(page).toHaveURL(/\/stocks\/TEST_DIV(\?|$)/);
   await expect(page.getByRole("heading", { name: "TEST_DIV" })).toBeVisible();
   await expect(page.getByText(/End-of-day, as of .* · Source: Synthetic/).first()).toBeVisible();
   await expectAccessible(page);

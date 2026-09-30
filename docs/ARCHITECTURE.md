@@ -31,7 +31,7 @@ Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec
 | `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups |
 | `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                              |
 | `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, operator CLI                                                                                               |
-| `apps/web`             | Next.js app for the owner: login, Markets, ticker pages, data health; ⌘K search; server-side queries only                                                                              |
+| `apps/web`             | Next.js app for the owner: login, Markets, ticker pages (lazy-loaded Lightweight Charts, indicators in a Web Worker above 5), data health; ⌘K search; server-side queries only         |
 
 Internal packages export TypeScript source. Vitest, tsx and Next.js (Turbopack) compile it directly, so there is no separate package build step.
 

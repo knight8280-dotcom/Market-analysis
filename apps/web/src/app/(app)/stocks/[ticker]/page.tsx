@@ -15,6 +15,13 @@ import {
 } from "@market/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { StockChart, type ChartSettings } from "../../../../components/chart/stock-chart";
+import {
+  DEFAULT_INDICATORS,
+  INDICATOR_IDS,
+  TIMEFRAMES,
+  type Timeframe,
+} from "../../../../lib/chart/catalog";
 import { requireOwner } from "../../../../server/auth/owner";
 import { db } from "../../../../server/db";
 import {
@@ -28,6 +35,20 @@ import {
 } from "../../../../server/market";
 
 type Params = Promise<{ ticker: string }>;
+type Search = Promise<Record<string, string | string[] | undefined>>;
+
+function chartSettings(q: Record<string, string | string[] | undefined>): ChartSettings {
+  const one = (k: string) => (typeof q[k] === "string" ? q[k] : undefined);
+  const tf = one("tf")?.toUpperCase();
+  const ind = one("ind");
+  return {
+    tf: (TIMEFRAMES as readonly string[]).includes(tf ?? "") ? (tf as Timeframe) : "1Y",
+    indicators:
+      ind === undefined ? DEFAULT_INDICATORS : ind.split(",").filter((id) => INDICATOR_IDS.has(id)),
+    adjusted: one("adj") !== "0",
+    type: one("type") === "line" ? "line" : "candles",
+  };
+}
 
 function tickerOf(raw: string): string {
   return decodeURIComponent(raw).trim().toUpperCase();
@@ -37,10 +58,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: tickerOf((await params).ticker) };
 }
 
-/** Ticker page header and recent bars (Phase 1 step D1; charts arrive in D2). */
-export default async function StockPage({ params }: { params: Params }) {
+/** Ticker page: header with the latest bar, the interactive chart and recent sessions. */
+export default async function StockPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Search;
+}) {
   await requireOwner();
   const ticker = tickerOf((await params).ticker);
+  const initial = chartSettings(await searchParams);
   const database = db();
   const security = await findSecurity(database, ticker);
   if (!security) notFound();
@@ -96,6 +124,8 @@ export default async function StockPage({ params }: { params: Params }) {
           <p className="text-sm text-muted-foreground">No prices for this security yet.</p>
         )}
       </header>
+
+      {bars.length > 0 ? <StockChart ticker={security.ticker} initial={initial} /> : null}
 
       {bars.length > 0 && info ? (
         <Card>

@@ -332,3 +332,73 @@ export async function recentBars(
     volume: Number(r.volume),
   }));
 }
+
+/** [date, open, high, low, close, volume], oldest first: compact for the chart API. */
+export type BarTuple = [string, number, number, number, number, number];
+
+/**
+ * Full daily history for a chart. Adjusted bars are split- and dividend-adjusted on read
+ * (prices_daily_adjusted); raw bars are as traded.
+ */
+export async function dailySeries(
+  db: Database,
+  securityId: string,
+  source: ProviderId,
+  adjusted: boolean,
+): Promise<BarTuple[]> {
+  const table = adjusted ? "market.prices_daily_adjusted" : "market.prices_daily";
+  const rows = await db
+    .selectFrom(table)
+    .select(["date", "open", "high", "low", "close", "volume"])
+    .where("security_id", "=", securityId)
+    .where("source", "=", source)
+    .orderBy("date")
+    .execute();
+  return rows.map((r) => [
+    String(r.date),
+    Number(r.open),
+    Number(r.high),
+    Number(r.low),
+    Number(r.close),
+    Number(r.volume),
+  ]);
+}
+
+export interface ChartAction {
+  date: string;
+  type: string;
+  /** Short marker text: "4:1", "1:10", "$0.24", "Spin-off". */
+  label: string;
+}
+
+function ratioLabel(ratio: number): string {
+  if (ratio >= 1) return `${Number(ratio.toFixed(4))}:1`;
+  return `1:${Number((1 / ratio).toFixed(4))}`;
+}
+
+/** Splits, dividends and other actions to mark on the chart. */
+export async function chartActions(
+  db: Database,
+  securityId: string,
+  source: ProviderId,
+): Promise<ChartAction[]> {
+  const rows = await db
+    .selectFrom("market.corporate_actions")
+    .select(["ex_date", "type", "ratio", "cash_amount"])
+    .where("security_id", "=", securityId)
+    .where("source", "=", source)
+    .orderBy("ex_date")
+    .execute();
+  return rows.map((r) => {
+    const ratio = r.ratio === null ? null : Number(r.ratio);
+    const cash = r.cash_amount === null ? null : Number(r.cash_amount);
+    let label = r.type.replaceAll("_", " ");
+    if ((r.type === "split" || r.type === "stock_dividend") && ratio) label = ratioLabel(ratio);
+    else if (cash !== null)
+      label = `$${cash
+        .toFixed(cash < 1 ? 4 : 2)
+        .replace(/0+$/, "")
+        .replace(/\.$/, "")}`;
+    return { date: r.ex_date, type: r.type, label };
+  });
+}

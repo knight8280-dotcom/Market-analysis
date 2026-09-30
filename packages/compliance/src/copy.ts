@@ -31,4 +31,9 @@ export const COPY = {
   },
   source: (name: string) => `Source: ${name}`,
   personalUse: "Personal use only. Licensed for the owner's own screen.",
+  /** Lightweight Charts NOTICE (Apache-2.0), shown with a link to tradingview.com (§12). */
+  chartAttribution: "TradingView Lightweight Charts™. Copyright (с) 2025 TradingView, Inc.",
+  chartAttributionUrl: "https://www.tradingview.com/",
+  adjusted: (adjusted: boolean) =>
+    adjusted ? "Adjusted for splits and dividends" : "As traded (not adjusted)",
 } as const;

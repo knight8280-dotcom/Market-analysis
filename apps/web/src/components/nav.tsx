@@ -4,6 +4,7 @@ import { cn } from "@market/ui";
 import {
   Activity,
   Bell,
+  Briefcase,
   CalendarDays,
   Filter,
   Grid2x2,
@@ -19,6 +20,7 @@ export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Markets", icon: LayoutDashboard },
   { href: "/screener", label: "Screener", icon: Filter },
   { href: "/watchlists", label: "Watchlists", icon: ListChecks },
+  { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/heatmap", label: "Heatmap", icon: Grid2x2 },
   { href: "/alerts", label: "Alerts", icon: Bell },

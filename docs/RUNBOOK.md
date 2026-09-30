@@ -145,6 +145,14 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **A failed email** (status "Failed" with Resend's error) is retried by the job's own retries; if it keeps failing, check the key and address, then run `pnpm worker alerts` again. Failed events older than a day are not retried.
 - To check delivery end to end without Resend, point `RESEND_API_URL` at a local capture server (the E2E test does this).
 
+## Portfolio
+
+- `/portfolio`: create a portfolio (benchmark ticker defaults to SPY), then add transactions by hand or import a CSV. Returns, allocation and dividends are calculated on each page load from the entries and end-of-day closes (ADR-023).
+- **CSV format:** `date,type,ticker,quantity,price,amount,fees,notes` (download the template from the page). Types: buy, sell, dividend, deposit, withdrawal, fee. Quantities and prices as traded; splits are applied automatically. Buys without deposits are fine: cash shortfalls count as deposits.
+- **Imports are all or nothing.** Fix the lines listed and import the file again; nothing is stored until every line passes (including "sells more than held").
+- If a holding shows "valued at cost", its prices are not loaded (add the ticker to `config/universe.json` and backfill).
+- Regenerate the reference fixture after changing a convention: `python3 packages/portfolio/scripts/make_fixture.py`, then `pnpm --filter @market/portfolio test`.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

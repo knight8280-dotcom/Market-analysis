@@ -206,3 +206,17 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Firing and delivery are separate. Events start `pending`; delivery marks them `sent`, `failed` or `suppressed` (no email settings, a user other than the owner, or over `ALERT_DAILY_CAP`, default 20 per day). Failed sends make the job fail so the queue retries; Resend's `Idempotency-Key` (`alert-event-<id>`) stops a retry from sending a second copy.
   - Email goes only to `ALERT_EMAIL_TO`, the owner's own address, in plain text, with the data's as-of date and source, a SAMPLE DATA marker on synthetic data, and "not investment advice".
 - **Consequences:** a price that gaps across a level between two runs still fires once (on the first bar past it). A day the worker misses is not re-evaluated; the next run looks at the latest bar only. Every event is listed on `/alerts` whether or not it was emailed.
+
+## ADR-023: Portfolio returns from a replayed ledger, checked against a spreadsheet-style reference
+
+- **Context:** portfolio figures must match a spreadsheet within 0.01% (plan J2), handle splits, and give sensible returns when the owner records only trades (no deposits).
+- **Decision (`@market/portfolio`, pure TypeScript):**
+  - The ledger is replayed day by day over the union of trading days, transaction dates and the end date, from the first transaction to the latest loaded session. Holdings are valued at raw end-of-day closes, carried forward over gaps; a security with no close yet is valued at cost, with a warning.
+  - Lots are first-in, first-out. A split or stock dividend (from the price source's corporate actions) multiplies the quantity of lots opened before its ex-date and divides their cost per share, at the first day on or after the ex-date, before that day's trades. Buy fees go into cost; sell fees reduce proceeds.
+  - Cash never goes negative: a shortfall at the end of a day is an implicit deposit (an external flow), so a trades-only ledger still has correct returns.
+  - Time-weighted return chains daily returns with external flows at the start of the day: r = V_t / (V_{t−1} + F_t) − 1. Dividends and fees are part of the return, not flows. Annualized only over a year or more.
+  - Money-weighted return is XIRR (actual/365), Newton's method with a bisection fallback; it matches the spreadsheet function's documented example to 1e-8.
+  - The benchmark (default SPY) is its total-return index (split- and dividend-adjusted closes) over the same days.
+  - Imports are all-or-nothing: every row is validated (the manual form uses the same rules), tickers must exist, and no sell may exceed the shares held at the time after splits.
+- **Checked:** `scripts/make_fixture.py` computes the same scenario row by row the way a spreadsheet would (two made-up securities, a 2:1 split, FIFO sales across lots, a weekend dividend, implicit deposits, a withdrawal, fees) and writes `test/fixtures/expected.csv`. Every day's cash, value, flow and index and every summary figure match within 0.01%.
+- **Consequences:** returns depend on the owner's entries; wrong trade prices or missing dividends show up directly in the figures. Taxes, currencies other than USD, options and short positions are out of scope.

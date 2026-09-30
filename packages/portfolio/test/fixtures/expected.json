@@ -1,0 +1,673 @@
+{
+ "twr": 0.0455869683997685,
+ "xirr": 0.18740657487251566,
+ "maxDrawdown": 0.10186011555263286,
+ "value": 11483.1,
+ "cash": 3404.0,
+ "netContributions": 11038.0,
+ "realized": 676.75,
+ "unrealized": -259.1500000000001,
+ "dividends": 42.5,
+ "fees": 21.0,
+ "positions": [
+  {
+   "securityId": "A",
+   "quantity": 10.0,
+   "costBasis": 1034.5,
+   "price": 92.16,
+   "marketValue": 921.5999999999999,
+   "unrealized": -112.90000000000009
+  },
+  {
+   "securityId": "B",
+   "quantity": 350.0,
+   "costBasis": 7303.75,
+   "price": 20.45,
+   "marketValue": 7157.5,
+   "unrealized": -146.25
+  }
+ ],
+ "benchmarkTotal": 0.04769150682737355,
+ "days": [
+  {
+   "date": "2025-01-02",
+   "cash": 10000.0,
+   "holdings": 0.0,
+   "value": 10000.0,
+   "flow": 10000.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0,
+   "index": 1.0
+  },
+  {
+   "date": "2025-01-03",
+   "cash": 4986.5,
+   "holdings": 5044.0,
+   "value": 10030.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.003049999999999997,
+   "index": 1.00305
+  },
+  {
+   "date": "2025-01-06",
+   "cash": 975.5,
+   "holdings": 9142.5,
+   "value": 10118.0,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.00872339364936936,
+   "index": 1.0118
+  },
+  {
+   "date": "2025-01-07",
+   "cash": 975.5,
+   "holdings": 9085.0,
+   "value": 10060.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0056829412927456024,
+   "index": 1.00605
+  },
+  {
+   "date": "2025-01-08",
+   "cash": 975.5,
+   "holdings": 9171.5,
+   "value": 10147.0,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.00859798220764385,
+   "index": 1.0147000000000002
+  },
+  {
+   "date": "2025-01-09",
+   "cash": 975.5,
+   "holdings": 9104.5,
+   "value": 10080.0,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0066029368286193435,
+   "index": 1.008
+  },
+  {
+   "date": "2025-01-10",
+   "cash": 975.5,
+   "holdings": 9142.5,
+   "value": 10118.0,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0037698412698412564,
+   "index": 1.0118
+  },
+  {
+   "date": "2025-01-13",
+   "cash": 975.5,
+   "holdings": 9126.0,
+   "value": 10101.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0016307570666139748,
+   "index": 1.01015
+  },
+  {
+   "date": "2025-01-14",
+   "cash": 975.5,
+   "holdings": 9144.5,
+   "value": 10120.0,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.001831411176557829,
+   "index": 1.012
+  },
+  {
+   "date": "2025-01-15",
+   "cash": 0.0,
+   "holdings": 11165.5,
+   "value": 11165.5,
+   "flow": 1093.5,
+   "implicitDeposit": 1093.5,
+   "dailyReturn": -0.004280554688545046,
+   "index": 1.0076680786551924
+  },
+  {
+   "date": "2025-01-16",
+   "cash": 0.0,
+   "holdings": 11207.0,
+   "value": 11207.0,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0037168062334871355,
+   "index": 1.011413385651224
+  },
+  {
+   "date": "2025-01-17",
+   "cash": 0.0,
+   "holdings": 11291.900000000001,
+   "value": 11291.900000000001,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.00757562237887055,
+   "index": 1.0190754715298527
+  },
+  {
+   "date": "2025-01-20",
+   "cash": 0.0,
+   "holdings": 11335.900000000001,
+   "value": 11335.900000000001,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0038965984466741155,
+   "index": 1.0230463994292596
+  },
+  {
+   "date": "2025-01-21",
+   "cash": 0.0,
+   "holdings": 11404.2,
+   "value": 11404.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.006025106078917375,
+   "index": 1.0292103625094753
+  },
+  {
+   "date": "2025-01-22",
+   "cash": 0.0,
+   "holdings": 11495.900000000001,
+   "value": 11495.900000000001,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.008040897213307474,
+   "index": 1.0374861372452848
+  },
+  {
+   "date": "2025-01-23",
+   "cash": 0.0,
+   "holdings": 11387.5,
+   "value": 11387.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.009429448759992853,
+   "index": 1.0277032148749274
+  },
+  {
+   "date": "2025-01-24",
+   "cash": 0.0,
+   "holdings": 11214.2,
+   "value": 11214.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.015218441273325944,
+   "index": 1.012063173852945
+  },
+  {
+   "date": "2025-01-25",
+   "cash": 12.5,
+   "holdings": 11214.2,
+   "value": 11226.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.001114658201209151,
+   "index": 1.013191278369822
+  },
+  {
+   "date": "2025-01-27",
+   "cash": 12.5,
+   "holdings": 11112.6,
+   "value": 11125.1,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.009049854365040466,
+   "index": 1.004022044856646
+  },
+  {
+   "date": "2025-01-28",
+   "cash": 12.5,
+   "holdings": 11383.4,
+   "value": 11395.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.024341354235018153,
+   "index": 1.0284613011102688
+  },
+  {
+   "date": "2025-01-29",
+   "cash": 12.5,
+   "holdings": 11242.2,
+   "value": 11254.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.012390421116366346,
+   "index": 1.0157182324876266
+  },
+  {
+   "date": "2025-01-30",
+   "cash": 12.5,
+   "holdings": 11232.3,
+   "value": 11244.8,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.000879632509085182,
+   "index": 1.01482477371026
+  },
+  {
+   "date": "2025-01-31",
+   "cash": 12.5,
+   "holdings": 11328.4,
+   "value": 11340.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.008546172453044898,
+   "index": 1.0234976412360102
+  },
+  {
+   "date": "2025-02-03",
+   "cash": 12.5,
+   "holdings": 11508.9,
+   "value": 11521.4,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.01591584442151861,
+   "index": 1.0397874704597139
+  },
+  {
+   "date": "2025-02-04",
+   "cash": 12.5,
+   "holdings": 11486.7,
+   "value": 11499.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0019268491676357469,
+   "index": 1.0377839568377405
+  },
+  {
+   "date": "2025-02-05",
+   "cash": 12.5,
+   "holdings": 11748.2,
+   "value": 11760.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.022740712397384177,
+   "index": 1.061383903330807
+  },
+  {
+   "date": "2025-02-06",
+   "cash": 12.5,
+   "holdings": 11642.4,
+   "value": 11654.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.008996063159505852,
+   "index": 1.0518356266999602
+  },
+  {
+   "date": "2025-02-07",
+   "cash": 12.5,
+   "holdings": 11506.1,
+   "value": 11518.6,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.011694652034766384,
+   "index": 1.0395347750479338
+  },
+  {
+   "date": "2025-02-10",
+   "cash": 6371.5,
+   "holdings": 5303.6,
+   "value": 11675.1,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.013586720608407266,
+   "index": 1.0536586435992337
+  },
+  {
+   "date": "2025-02-11",
+   "cash": 6371.5,
+   "holdings": 5405.7,
+   "value": 11777.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.00874510710829024,
+   "index": 1.0628730012930847
+  },
+  {
+   "date": "2025-02-12",
+   "cash": 6371.5,
+   "holdings": 5381.3,
+   "value": 11752.8,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0020717997486670026,
+   "index": 1.0606709412761408
+  },
+  {
+   "date": "2025-02-13",
+   "cash": 6371.5,
+   "holdings": 5378.6,
+   "value": 11750.1,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.00022973248927904422,
+   "index": 1.0604272707004956
+  },
+  {
+   "date": "2025-02-14",
+   "cash": 4371.5,
+   "holdings": 5508.2,
+   "value": 9879.7,
+   "flow": -2000.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.013292171362345062,
+   "index": 1.0745226516999504
+  },
+  {
+   "date": "2025-02-17",
+   "cash": 4371.5,
+   "holdings": 5483.4,
+   "value": 9854.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.002510197678067261,
+   "index": 1.0718253874346226
+  },
+  {
+   "date": "2025-02-18",
+   "cash": 4371.5,
+   "holdings": 5508.0,
+   "value": 9879.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0024962201544409535,
+   "index": 1.0745008995687784
+  },
+  {
+   "date": "2025-02-19",
+   "cash": 4371.5,
+   "holdings": 5529.7,
+   "value": 9901.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.002196467432562521,
+   "index": 1.0768610058009402
+  },
+  {
+   "date": "2025-02-20",
+   "cash": 4356.5,
+   "holdings": 5598.1,
+   "value": 9954.6,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.005393285662343983,
+   "index": 1.0826688248238638
+  },
+  {
+   "date": "2025-02-21",
+   "cash": 4356.5,
+   "holdings": 5700.4,
+   "value": 10056.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.010276656018323171,
+   "index": 1.093795039918341
+  },
+  {
+   "date": "2025-02-24",
+   "cash": 4356.5,
+   "holdings": 5747.8,
+   "value": 10104.3,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.004713181994451476,
+   "index": 1.0989502950061043
+  },
+  {
+   "date": "2025-02-25",
+   "cash": 4356.5,
+   "holdings": 5670.0,
+   "value": 10026.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.007699692210247022,
+   "index": 1.090488715980197
+  },
+  {
+   "date": "2025-02-26",
+   "cash": 4356.5,
+   "holdings": 5807.4,
+   "value": 10163.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.013703685234129459,
+   "index": 1.1054324300953597
+  },
+  {
+   "date": "2025-02-27",
+   "cash": 4356.5,
+   "holdings": 5762.8,
+   "value": 10119.3,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.00438807937897856,
+   "index": 1.100581704844004
+  },
+  {
+   "date": "2025-02-28",
+   "cash": 4356.5,
+   "holdings": 5643.1,
+   "value": 9999.6,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.011828881444368555,
+   "index": 1.0875630543375634
+  },
+  {
+   "date": "2025-03-03",
+   "cash": 0.0,
+   "holdings": 12571.5,
+   "value": 12571.5,
+   "flow": 1944.5,
+   "implicitDeposit": 1944.5,
+   "dailyReturn": 0.05252802638959819,
+   "index": 1.144690595156159
+  },
+  {
+   "date": "2025-03-04",
+   "cash": 0.0,
+   "holdings": 12773.4,
+   "value": 12773.4,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.01606013602195433,
+   "index": 1.1630744818174188
+  },
+  {
+   "date": "2025-03-05",
+   "cash": 0.0,
+   "holdings": 12733.8,
+   "value": 12733.8,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0031001925877214287,
+   "index": 1.1594687269299204
+  },
+  {
+   "date": "2025-03-06",
+   "cash": 0.0,
+   "holdings": 12761.9,
+   "value": 12761.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.002206725407969401,
+   "index": 1.1620273560293826
+  },
+  {
+   "date": "2025-03-07",
+   "cash": 0.0,
+   "holdings": 12668.2,
+   "value": 12668.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.007342166918718918,
+   "index": 1.1534955572172971
+  },
+  {
+   "date": "2025-03-10",
+   "cash": 0.0,
+   "holdings": 12309.7,
+   "value": 12309.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.028299205885603307,
+   "index": 1.1208525489554761
+  },
+  {
+   "date": "2025-03-11",
+   "cash": 0.0,
+   "holdings": 12327.6,
+   "value": 12327.6,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0014541377937724587,
+   "index": 1.1224824230081585
+  },
+  {
+   "date": "2025-03-12",
+   "cash": 0.0,
+   "holdings": 12027.9,
+   "value": 12027.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.024311301469872593,
+   "index": 1.0951934144277742
+  },
+  {
+   "date": "2025-03-13",
+   "cash": 0.0,
+   "holdings": 12046.8,
+   "value": 12046.8,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.001571346619110514,
+   "index": 1.0969143428968073
+  },
+  {
+   "date": "2025-03-14",
+   "cash": 30.0,
+   "holdings": 11699.5,
+   "value": 11729.5,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.026338944782016704,
+   "index": 1.068022776588646
+  },
+  {
+   "date": "2025-03-17",
+   "cash": 30.0,
+   "holdings": 11780.2,
+   "value": 11810.2,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0068800886653310744,
+   "index": 1.075370867988169
+  },
+  {
+   "date": "2025-03-18",
+   "cash": 30.0,
+   "holdings": 11694.7,
+   "value": 11724.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.007239504834803845,
+   "index": 1.0675857153901616
+  },
+  {
+   "date": "2025-03-19",
+   "cash": 30.0,
+   "holdings": 11658.9,
+   "value": 11688.9,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0030533830289901642,
+   "index": 1.064325967284797
+  },
+  {
+   "date": "2025-03-20",
+   "cash": 3404.0,
+   "holdings": 8306.6,
+   "value": 11710.6,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0018564621136292203,
+   "index": 1.066301848119613
+  },
+  {
+   "date": "2025-03-21",
+   "cash": 3404.0,
+   "holdings": 8251.7,
+   "value": 11655.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.004688060389732351,
+   "index": 1.061302960661945
+  },
+  {
+   "date": "2025-03-24",
+   "cash": 3404.0,
+   "holdings": 8246.3,
+   "value": 11650.3,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.00046329263793687403,
+   "index": 1.0608112668136498
+  },
+  {
+   "date": "2025-03-25",
+   "cash": 3404.0,
+   "holdings": 8331.8,
+   "value": 11735.8,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.007338866810296718,
+   "index": 1.0685964194116573
+  },
+  {
+   "date": "2025-03-26",
+   "cash": 3404.0,
+   "holdings": 8121.7,
+   "value": 11525.7,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.017902486409107077,
+   "index": 1.0494658865363196
+  },
+  {
+   "date": "2025-03-27",
+   "cash": 3404.0,
+   "holdings": 8068.3,
+   "value": 11472.3,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.004633124235404518,
+   "index": 1.044603580703178
+  },
+  {
+   "date": "2025-03-28",
+   "cash": 3404.0,
+   "holdings": 8089.3,
+   "value": 11493.3,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": 0.0018304960644335289,
+   "index": 1.0465157234465483
+  },
+  {
+   "date": "2025-03-31",
+   "cash": 3404.0,
+   "holdings": 8079.1,
+   "value": 11483.1,
+   "flow": 0.0,
+   "implicitDeposit": 0.0,
+   "dailyReturn": -0.0008874735715589388,
+   "index": 1.0455869683997685
+  }
+ ]
+}

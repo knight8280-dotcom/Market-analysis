@@ -161,4 +161,5 @@ Approved 2026-09-30 with the defaults (local only, Tiingo free key when provided
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A     | A1, A2, A3, A5 done. A4 (live Tiingo shape check) and the live part of A6 wait for the Tiingo key: `pnpm worker verify-tiingo`, then `pnpm worker bootstrap` (RUNBOOK).          |
 | B     | done: `packages/ui`, owner login (ADR-018), app shell with ⌘K search and "last updated", compliance labels and banners; Playwright + axe in CI. D1's ticker header came with it. |
-| C–K   | not started                                                                                                                                                                      |
+| C     | done: `packages/indicators`, 17 indicators matching TA-Lib 0.8.1 output (worst difference about 4e-12), fixture script committed (ADR-019).                                      |
+| D–K   | not started                                                                                                                                                                      |

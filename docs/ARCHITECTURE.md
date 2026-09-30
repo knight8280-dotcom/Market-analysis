@@ -28,6 +28,7 @@ Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec
 | `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                          |
 | `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine |
 | `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                |
+| `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups |
 | `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                              |
 | `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, operator CLI                                                                                               |
 | `apps/web`             | Next.js app for the owner: login, Markets, ticker pages, data health; ⌘K search; server-side queries only                                                                              |

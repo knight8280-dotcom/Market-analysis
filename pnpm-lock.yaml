@@ -173,6 +173,8 @@ importers:
         specifier: 0.20.0
         version: 0.20.0(kysely@0.29.6)(pg@8.23.0)(typescript@6.0.3)
 
+  packages/indicators: {}
+
   packages/market-data:
     dependencies:
       '@market/calendar':

@@ -167,3 +167,9 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Only loopback host names (plus `WEB_ALLOWED_HOSTS`) are served, against DNS rebinding; `pnpm web` binds to 127.0.0.1.
   - Failed sign-ins are throttled globally: 10 per 15 minutes.
 - **Consequences:** no user table, no password reset by email (re-run the hash command). A cloud deploy or a second user replaces this with Supabase Auth (Phase 1 group L), keeping the proxy and `requireOwner` call sites.
+
+## ADR-019: Indicators follow TA-Lib's conventions, checked against TA-Lib output
+
+- **Context:** indicator values differ between libraries in small, visible ways (EMA seeding, Wilder smoothing, warm-up length, population vs sample deviation). The plan requires matching a reference within 1e-6.
+- **Decision:** `packages/indicators` reproduces TA-Lib 0.8 exactly, quirks included: EMAs seeded with an SMA; MACD's fast EMA seeded at the slow EMA's first index, with all three lines starting at index 33 (12/26/9); RSI, ATR and DI with Wilder smoothing from a simple-average seed; Bollinger with population deviation; slow %K and %D starting together; OBV starting at the first volume; flat input giving 0 (RSI, %R, CCI, DI). Indicators TA-Lib lacks (rolling VWAP, Donchian, Keltner, annualized volatility, relative strength) are checked against plain NumPy/pandas formulas. `scripts/make_fixtures.py` regenerates the fixtures from a seeded synthetic walk.
+- **Consequences:** charts agree with most trading platforms. The worst difference seen is about 4e-12. Changing a convention means regenerating the fixtures and noting it here.

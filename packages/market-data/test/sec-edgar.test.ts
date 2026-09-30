@@ -1,0 +1,178 @@
+import { describe, expect, it, vi } from "vitest";
+import { acceptanceTime, padCik, SecEdgarProvider, secUserAgent } from "../src/adapters/sec-edgar";
+import { ProviderResponseError } from "../src/errors";
+import { fixtureFetch } from "./helpers/fixtures";
+
+const now = new Date("2026-09-30T12:00:00Z");
+function provider(routes: Parameters<typeof fixtureFetch>[0]) {
+  const f = fixtureFetch(routes);
+  const acquire = vi.fn(() => Promise.resolve(0));
+  const p = new SecEdgarProvider({
+    appName: "Example Analytics",
+    contactEmail: "admin@example.com",
+    rateLimiter: { acquire },
+    baseUrl: "https://sec.test",
+    fetch: f.fetch,
+    sleep: () => Promise.resolve(),
+    now: () => now,
+  });
+  return { p, calls: f.calls, acquire };
+}
+
+describe("SEC EDGAR helpers", () => {
+  it("pads CIKs to 10 digits", () => {
+    expect(padCik(320193)).toBe("0000320193");
+    expect(padCik("CIK0000320193")).toBe("0000320193");
+    expect(() => padCik("12345678901")).toThrow();
+  });
+
+  it("requires a declared contact in the User-Agent", () => {
+    expect(secUserAgent("Example Analytics", "admin@example.com")).toBe(
+      "Example Analytics admin@example.com",
+    );
+    expect(() => secUserAgent("Example", "")).toThrow(/contact email/);
+    expect(() => secUserAgent(" ", "admin@example.com")).toThrow();
+  });
+
+  it("reads acceptanceDateTime as Eastern wall-clock time", () => {
+    // 06:01:36 EDT is 10:01:36 UTC.
+    expect(acceptanceTime("2025-08-01T06:01:36.000Z", "2025-08-01").toISOString()).toBe(
+      "2025-08-01T10:01:36.000Z",
+    );
+    expect(acceptanceTime("", "2025-02-14").toISOString()).toBe("2025-02-14T05:00:00.000Z");
+  });
+});
+
+describe("SecEdgarProvider", () => {
+  it("sends the declared User-Agent and takes a rate-limit slot per request", async () => {
+    const { p, calls, acquire } = provider({
+      "/files/company_tickers_exchange.json": "sec-edgar/company_tickers_exchange.json",
+    });
+    await p.getTickerMap();
+    expect(calls[0]!.headers["user-agent"]).toBe("Example Analytics admin@example.com");
+    expect(calls[0]!.headers["accept-encoding"]).toBe("gzip, deflate");
+    expect(acquire).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps the ticker file, keeping share classes and unknown exchanges", async () => {
+    const { p } = provider({
+      "/files/company_tickers_exchange.json": "sec-edgar/company_tickers_exchange.json",
+    });
+    const map = await p.getTickerMap();
+    expect(map).toHaveLength(4);
+    expect(map[0]).toEqual({
+      cik: "0000000042",
+      name: "Test Registrant Inc.",
+      ticker: "TEST_EDGR",
+      exchange: "Nasdaq",
+    });
+    expect(map.filter((e) => e.cik === "0000000043").map((e) => e.ticker)).toEqual([
+      "TEST_HLDA",
+      "TEST_HLDB",
+    ]);
+    expect(map[3]!.exchange).toBeNull();
+  });
+
+  it("maps recent filings with acceptance time, items and document URLs", async () => {
+    const { p, calls } = provider({
+      "/submissions/CIK0000000042.json": "sec-edgar/submissions-CIK0000000042.json",
+    });
+    const filings = await p.getFilings({ cik: "42" });
+    expect(calls[0]!.url).toBe("https://sec.test/submissions/CIK0000000042.json");
+    expect(filings).toHaveLength(4);
+    const [q, eightK, , form4] = filings;
+    expect(q).toMatchObject({
+      source: "sec_edgar",
+      license_tier: "public_domain",
+      cik: "0000000042",
+      accession_no: "0000000042-25-000010",
+      form_type: "10-Q",
+      filing_date: "2025-08-01",
+      period: "2025-06-28",
+      items: [],
+      url: "https://sec.test/Archives/edgar/data/42/000000004225000010/test-20250628.htm",
+    });
+    expect(q!.filed_at.toISOString()).toBe("2025-08-01T10:01:36.000Z");
+    expect(q!.as_of).toEqual(q!.filed_at);
+    expect(eightK!.items).toEqual(["2.02", "9.01"]);
+    expect(form4).toMatchObject({ period: null, primary_document: null });
+    expect(form4!.url).toBe(
+      "https://sec.test/Archives/edgar/data/42/000000004225000007/0000000042-25-000007-index.htm",
+    );
+  });
+
+  it("maps every companyfacts fact with its filing provenance", async () => {
+    const { p } = provider({
+      "/api/xbrl/companyfacts/CIK0000000042.json": "sec-edgar/companyfacts-CIK0000000042.json",
+    });
+    const facts = await p.getFundamentals({ cik: "0000000042" });
+    expect(facts).toHaveLength(6);
+    const shares = facts.find((f) => f.concept === "EntityCommonStockSharesOutstanding")!;
+    expect(shares).toMatchObject({
+      taxonomy: "dei",
+      unit: "shares",
+      period_start: null,
+      value: 250000000,
+      frame: "CY2025Q2I",
+    });
+    // The same revenue figure reported again in a later filing is kept as a separate fact.
+    const revenue = facts.filter((f) => f.concept === "Revenues" && f.period_end === "2024-06-29");
+    expect(revenue.map((f) => f.accession_no)).toEqual([
+      "0000000042-24-000080",
+      "0000000042-25-000010",
+    ]);
+    expect(revenue[1]!.frame).toBeNull();
+    const eps = facts.find((f) => f.concept === "EarningsPerShareBasic")!;
+    expect(eps).toMatchObject({
+      unit: "USD/shares",
+      value: 0.5,
+      fiscal_year: 2025,
+      fiscal_period: "Q3",
+    });
+    const assets = facts.find((f) => f.concept === "Assets")!;
+    expect(assets).toMatchObject({
+      fiscal_year: null,
+      fiscal_period: null,
+      filed_at: "2025-08-01",
+    });
+    expect(assets.as_of.toISOString()).toBe("2025-08-01T04:00:00.000Z");
+  });
+
+  it("rejects a changed response shape instead of guessing", async () => {
+    const { p } = provider({
+      "/submissions/CIK0000000042.json": {
+        status: 200,
+        body: JSON.stringify({ cik: "42", name: "x", filings: {} }),
+      },
+    });
+    await expect(p.getFilings({ cik: "42" })).rejects.toBeInstanceOf(ProviderResponseError);
+  });
+
+  it("backs off and retries when SEC answers 403", async () => {
+    let n = 0;
+    const fetchImpl = ((input: string | URL | Request, init?: RequestInit) => {
+      n += 1;
+      if (n === 1) return Promise.resolve(new Response("", { status: 403 }));
+      return fixtureFetch({
+        "/submissions/CIK0000000042.json": "sec-edgar/submissions-CIK0000000042.json",
+      }).fetch(input, init);
+    }) as typeof fetch;
+    const p = new SecEdgarProvider({
+      appName: "Example Analytics",
+      contactEmail: "admin@example.com",
+      rateLimiter: { acquire: () => Promise.resolve(0) },
+      baseUrl: "https://sec.test",
+      fetch: fetchImpl,
+      sleep: () => Promise.resolve(),
+    });
+    await expect(p.getFilings({ cik: "42" })).resolves.toHaveLength(4);
+    expect(p.http.statusCounts.get(403)).toBe(1);
+  });
+
+  it("does not support price datasets", async () => {
+    const { p } = provider({});
+    await expect(
+      p.getDailyBars({ symbol: "X", start: "2024-01-02", end: "2024-01-03" }),
+    ).rejects.toThrow(/does not support/);
+  });
+});

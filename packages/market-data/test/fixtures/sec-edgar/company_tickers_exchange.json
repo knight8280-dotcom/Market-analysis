@@ -1,0 +1,9 @@
+{
+  "fields": ["cik", "name", "ticker", "exchange"],
+  "data": [
+    [42, "Test Registrant Inc.", "TEST_EDGR", "Nasdaq"],
+    [43, "Test Holdings Corp", "TEST_HLDA", "NYSE"],
+    [43, "Test Holdings Corp", "TEST_HLDB", "NYSE"],
+    [44, "Test OTC Ltd", "TEST_OTC", null]
+  ]
+}

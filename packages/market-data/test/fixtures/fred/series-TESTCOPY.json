@@ -1,0 +1,15 @@
+{
+  "seriess": [
+    {
+      "id": "TESTCOPY",
+      "title": "Test copyrighted index",
+      "observation_start": "2000-01-03",
+      "observation_end": "2026-09-28",
+      "frequency": "Daily",
+      "units": "Index",
+      "seasonal_adjustment": "Not Seasonally Adjusted",
+      "last_updated": "2026-09-29 16:02:05-05",
+      "notes": "Copyright, 2026, Example Index Provider. All rights reserved. Reprinted with permission."
+    }
+  ]
+}

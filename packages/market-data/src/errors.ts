@@ -47,3 +47,11 @@ export class RateLimiterUnavailableError extends Error {
     this.name = "RateLimiterUnavailableError";
   }
 }
+
+/** The data exists but our license does not cover it (e.g. a third-party copyrighted FRED series). */
+export class LicenseRestrictedError extends ProviderError {
+  constructor(provider: ProviderId, message: string) {
+    super(provider, message, { retryable: false });
+    this.name = "LicenseRestrictedError";
+  }
+}

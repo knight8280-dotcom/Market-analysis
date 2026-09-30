@@ -1,0 +1,103 @@
+{
+  "cik": 42,
+  "entityName": "Test Registrant Inc.",
+  "facts": {
+    "dei": {
+      "EntityCommonStockSharesOutstanding": {
+        "label": "Entity Common Stock, Shares Outstanding",
+        "description": "Shares outstanding",
+        "units": {
+          "shares": [
+            {
+              "end": "2025-07-18",
+              "val": 250000000,
+              "accn": "0000000042-25-000010",
+              "fy": 2025,
+              "fp": "Q3",
+              "form": "10-Q",
+              "filed": "2025-08-01",
+              "frame": "CY2025Q2I"
+            }
+          ]
+        }
+      }
+    },
+    "us-gaap": {
+      "Revenues": {
+        "label": "Revenues",
+        "description": "Revenue",
+        "units": {
+          "USD": [
+            {
+              "start": "2024-03-31",
+              "end": "2024-06-29",
+              "val": 1000000000,
+              "accn": "0000000042-24-000080",
+              "fy": 2024,
+              "fp": "Q3",
+              "form": "10-Q",
+              "filed": "2024-08-02",
+              "frame": "CY2024Q2"
+            },
+            {
+              "start": "2024-03-31",
+              "end": "2024-06-29",
+              "val": 1000000000,
+              "accn": "0000000042-25-000010",
+              "fy": 2025,
+              "fp": "Q3",
+              "form": "10-Q",
+              "filed": "2025-08-01"
+            },
+            {
+              "start": "2025-03-30",
+              "end": "2025-06-28",
+              "val": 1100000000,
+              "accn": "0000000042-25-000010",
+              "fy": 2025,
+              "fp": "Q3",
+              "form": "10-Q",
+              "filed": "2025-08-01",
+              "frame": "CY2025Q2"
+            }
+          ]
+        }
+      },
+      "EarningsPerShareBasic": {
+        "label": "Earnings Per Share, Basic",
+        "units": {
+          "USD/shares": [
+            {
+              "start": "2025-03-30",
+              "end": "2025-06-28",
+              "val": 0.5,
+              "accn": "0000000042-25-000010",
+              "fy": 2025,
+              "fp": "Q3",
+              "form": "10-Q",
+              "filed": "2025-08-01",
+              "frame": "CY2025Q2"
+            }
+          ]
+        }
+      },
+      "Assets": {
+        "label": "Assets",
+        "units": {
+          "USD": [
+            {
+              "end": "2025-06-28",
+              "val": 5000000000,
+              "accn": "0000000042-25-000010",
+              "fy": null,
+              "fp": null,
+              "form": "10-Q",
+              "filed": "2025-08-01",
+              "frame": "CY2025Q2I"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

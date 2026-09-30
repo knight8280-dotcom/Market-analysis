@@ -51,6 +51,15 @@ describe("HttpClient", () => {
     expect(http.statusCounts.get(200)).toBe(1);
   });
 
+  it("keeps defaults when an option is passed as undefined", async () => {
+    server = await startServer((_req, res, n) =>
+      n === 1 ? json(res, 503, {}) : json(res, 200, {}),
+    );
+    const { http } = client(server.host, { maxRetries: undefined, fetch: undefined });
+    await expect(http.getJson(server.url("/x"))).resolves.toEqual({});
+    expect(server.requests).toHaveLength(2);
+  });
+
   it("honors Retry-After", async () => {
     server = await startServer((_req, res, n) =>
       n === 1 ? json(res, 429, {}, { "retry-after": "2" }) : json(res, 200, {}),

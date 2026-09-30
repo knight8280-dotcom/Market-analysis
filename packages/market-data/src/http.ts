@@ -64,7 +64,10 @@ export class HttpClient {
       fetch: globalThis.fetch.bind(globalThis),
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       random: Math.random,
-      ...opts,
+      // Explicit `undefined` (e.g. an adapter forwarding an unset option) must not erase a default.
+      ...(Object.fromEntries(
+        Object.entries(opts).filter(([, value]) => value !== undefined),
+      ) as HttpClientOptions),
     };
   }
 

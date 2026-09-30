@@ -160,15 +160,24 @@ describe("simulated outage", () => {
     expect(r).toMatchObject({ source: "synthetic", rows_inserted: 1 });
   });
 
-  it("with no fallback, keeps serving last-good data and says so", async () => {
+  it("with no fallback: staleness only alerts; repeated failures serve last-good data", async () => {
     const { h } = await setup(null);
     h.setNow(AFTER_DEADLINE);
     await h.run("staleness-monitor");
+    // Nowhere to fail over to: the route stays, the staleness alert says what is wrong.
+    expect(await route(h)).toMatchObject({ active_source: "tiingo" });
+    expect((await openAlerts(h)).map((a) => a.kind)).toEqual(["staleness"]);
+
+    for (let i = 0; i < 3; i += 1) {
+      await expect(
+        h.run("ingest-eod", { symbol: "TEST_SPLIT4", start: "2026-09-29", end: "2026-09-29" }),
+      ).rejects.toThrow(/503/);
+    }
     expect(await route(h)).toMatchObject({ active_source: null });
     const alerts = await openAlerts(h);
     expect(alerts.map((a) => a.kind)).toEqual(["failover", "staleness"]);
     expect(alerts[0]!.message).toMatch(/no fallback; serving last-good data/);
-    // Jobs now fail fast rather than call a provider that is down.
+    // Jobs now fail fast instead of hammering a provider that is down.
     await expect(
       h.run("ingest-eod", { symbol: "TEST_SPLIT4", start: "2026-09-29", end: "2026-09-29" }),
     ).rejects.toThrow(/No provider is available/);
@@ -177,5 +186,31 @@ describe("simulated outage", () => {
       d: string;
     }>`select max(date)::text as d from market.prices_daily`.execute(h.t.db);
     expect(latest.rows[0]!.d).toBe("2026-09-28");
+  });
+
+  it("does not fail back on successes from before the outage", async () => {
+    const { h, primary } = await setup("synthetic");
+    // The primary answers fine (a streak of successes) but delivers nothing for 2026-09-29.
+    primary.failing = false;
+    for (let i = 0; i < 4; i += 1)
+      await h.run("ingest-eod", { symbol: "TEST_SPLIT4", start: "2026-09-21", end: "2026-09-21" });
+    const before = await h.t.db
+      .selectFrom("ops.provider_health")
+      .select("consecutive_successes")
+      .where("source", "=", "tiingo")
+      .executeTakeFirstOrThrow();
+    expect(before.consecutive_successes).toBe(4);
+
+    // 18:31 ET: stale, so fail over. The same monitor run then probes the healthy primary once.
+    h.setNow(AFTER_DEADLINE);
+    await h.run("staleness-monitor");
+    expect((await route(h)).active_source).toBe("synthetic");
+    const after = await h.t.db
+      .selectFrom("ops.provider_health")
+      .select("consecutive_successes")
+      .where("source", "=", "tiingo")
+      .executeTakeFirstOrThrow();
+    expect(after.consecutive_successes).toBe(1);
+    expect(h.events.filter((e) => e.type === "provider_failback")).toHaveLength(0);
   });
 });

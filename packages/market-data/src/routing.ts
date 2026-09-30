@@ -5,11 +5,12 @@ import type { Dataset, ProviderId } from "./types";
  * persists RouteState in ops.dataset_routing so every process agrees on the active provider.
  *
  * Policy:
- * - after `failuresBeforeFailover` consecutive failures of the active primary, or on a
- *   staleness breach, switch to the fallback (or to "none", meaning serve last-good data with a
- *   staleness banner) and emit `provider_failover`;
+ * - after `failuresBeforeFailover` consecutive failures of the active primary, switch to the
+ *   fallback (or to "none", meaning serve last-good data with a staleness banner); on a
+ *   staleness breach, switch only if a fallback exists; emit `provider_failover`;
  * - while failed over, the monitor probes the primary; after `successesBeforeFailback`
- *   consecutive healthy probes, switch back and emit `provider_failback`.
+ *   consecutive healthy probes (counted from the failover), switch back and emit
+ *   `provider_failback`.
  * One chart series never silently mixes sources: bars keep their `source`, and readers mark
  * the boundary where it changes.
  */
@@ -117,8 +118,13 @@ export function onPrimaryFailure(
   return failover(state, `${consecutiveFailures} consecutive failures: ${reason}`, now);
 }
 
-/** Called by the staleness monitor when the dataset breaches its freshness SLO. */
+/**
+ * Called by the staleness monitor when the dataset breaches its freshness SLO. Without a
+ * fallback there is nowhere better to go (the data is stale either way), so the route stays and
+ * the staleness alert and banner carry the message. Provider errors still fail over to "none".
+ */
 export function onStalenessBreach(state: RouteState, reason: string, now: Date): Decision {
+  if (state.fallback === null) return { state };
   return failover(state, `staleness: ${reason}`, now);
 }
 

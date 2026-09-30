@@ -8,7 +8,7 @@ import {
 } from "@market/market-data";
 import type { WorkerContext } from "./context";
 import { openAlert, recordEventAlert, resolveAlerts } from "./repo/alerts";
-import { recordFailure, recordSuccess } from "./repo/health";
+import { recordFailure, recordSuccess, resetSuccesses } from "./repo/health";
 import { loadRoute, saveRoute } from "./repo/routing";
 
 export class NoProviderAvailableError extends Error {
@@ -47,6 +47,8 @@ export async function applyDecision(ctx: WorkerContext, decision: Decision): Pro
   const at = event.at;
   await saveRoute(ctx.db, state, at);
   if (event.type === "provider_failover") {
+    // Failback needs healthy probes made after this point, not successes from before the outage.
+    await resetSuccesses(ctx.db, { source: event.from, dataset: event.dataset });
     await openAlert(ctx.db, {
       kind: "failover",
       dataset: event.dataset,

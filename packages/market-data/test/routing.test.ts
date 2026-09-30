@@ -34,11 +34,18 @@ describe("failover decisions", () => {
     expect(onStalenessBreach(d.state, "still stale", now).event).toBeUndefined();
   });
 
-  it("routes to no provider when there is no fallback", () => {
+  it("routes to no provider after repeated failures when there is no fallback", () => {
     const noFallback = initialRouteState("daily_bars", { primary: "tiingo", fallback: null });
-    const d = onStalenessBreach(noFallback, "stale", now);
+    const d = onPrimaryFailure(noFallback, 3, "HTTP 503", now);
     expect(d.state.active).toBeNull();
     expect(d.event).toMatchObject({ type: "provider_failover", to: null });
+  });
+
+  it("does not reroute on staleness when there is no fallback", () => {
+    const noFallback = initialRouteState("daily_bars", { primary: "tiingo", fallback: null });
+    const d = onStalenessBreach(noFallback, "stale", now);
+    expect(d.state.active).toBe("tiingo");
+    expect(d.event).toBeUndefined();
   });
 
   it("fails back after enough healthy probes of the primary", () => {

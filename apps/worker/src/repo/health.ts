@@ -66,3 +66,16 @@ export async function recordFailure(
     .executeTakeFirstOrThrow();
   return row.consecutive_failures;
 }
+
+/** Starts the failback probe count from zero (called when a dataset fails over). */
+export async function resetSuccesses(
+  db: Database,
+  h: { source: ProviderId; dataset: string },
+): Promise<void> {
+  await db
+    .updateTable("ops.provider_health")
+    .set({ consecutive_successes: 0 })
+    .where("source", "=", h.source)
+    .where("dataset", "=", h.dataset)
+    .execute();
+}

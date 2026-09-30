@@ -33,6 +33,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Build (Next.js production build)
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
 
   integration:
     name: Migrations and integration tests (Postgres 17, Redis 7)

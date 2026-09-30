@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./migrations": "./src/migrations.ts",
+    "./security": "./src/security.ts",
     "./testing": "./src/testing.ts"
   },
   "scripts": {

@@ -1,10 +1,27 @@
 import { expect, test } from "@playwright/test";
 import { expectAccessible, signIn } from "./helpers";
+import { API_ROUTES, PAGE_ROUTES } from "./routes";
 
 test("pages and APIs require the owner's session", async ({ page, request }) => {
+  for (const url of Object.values(PAGE_ROUTES)) {
+    const res = await request.get(url, { maxRedirects: 0 });
+    expect(res.status(), url).toBe(307);
+    expect(res.headers().location, url).toMatch(/^\/login(\?next=|$)/);
+  }
+  for (const url of Object.values(API_ROUTES)) {
+    const res = await request.get(url, { maxRedirects: 0 });
+    expect(res.status(), url).toBe(401);
+    expect(await res.json(), url).toEqual({ error: "Sign in required" });
+  }
+  // Server actions are POSTs to page URLs: refused the same way, before any action runs.
+  const action = await request.post("/portfolio", {
+    headers: { "Next-Action": "0".repeat(40) },
+    maxRedirects: 0,
+  });
+  expect(action.status()).toBe(307);
+
   await page.goto("/admin/data-health");
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fdata-health/);
-  expect((await request.get("/api/search?q=TEST")).status()).toBe(401);
   await expectAccessible(page);
 });
 

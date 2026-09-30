@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec is `/CLAUDE.md`; decisions and their reasons are in `DECISIONS.md`.
+Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is `/CLAUDE.md`; decisions and their reasons are in `DECISIONS.md`.
 
 ## Topology
 
@@ -8,8 +8,9 @@ Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec
                  ┌──────────────────────────── apps/worker (Node, long-running) ─────────────────────────────┐
  vendors         │  scheduler tick (30s, market calendar) ──► BullMQ queues ──► job handlers ──► Postgres     │
  (Tiingo,  ◄─────┤  HttpClient (allowlist, backoff) ◄─ adapters ◄─ provider routing/failover                  │
-  EDGAR,         │  Redis: queues, SEC rate limiter (shared by all processes), market-events pub/sub          │
-  FRED)          └────────────────────────────────────────────────────────────────────────────────────────────┘
+  EDGAR, FRED,   │  Redis: queues, rate limiters (shared by all processes), market-events pub/sub            │
+  Finnhub)       │  evaluate-alerts ──► Resend HTTP API ──► the owner's own inbox                             │
+                 └────────────────────────────────────────────────────────────────────────────────────────────┘
                  ┌──────────────── apps/web (Next.js 16) ─────────────────┐
  owner ─────────►│ proxy.ts (owner session) ─► pages + /api ─► market.*, ops.* │  (no provider calls from the browser, ever)
                  └─────────────────────────────────────────────────────────┘
@@ -21,17 +22,20 @@ Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec
 
 ## Packages
 
-| Package                | Role                                                                                                                                                                                                                                      |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/config`      | zod-validated env (`loadWorkerEnv`, `loadWebEnv`), secret redaction, production guards                                                                                                                                                    |
-| `packages/db`          | Kysely client (`@market/db`), migration runner and schema fingerprint (`/migrations`), security audit (`/security`), test databases (`/testing`), generated types                                                                         |
-| `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                                                                             |
-| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine, statement builder and SEC report parser (ADR-020) |
-| `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                                                                   |
-| `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups                                                    |
-| `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                                                                                 |
-| `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, operator CLI                                                                                                                                                  |
-| `apps/web`             | Next.js app for the owner: login, Markets, ticker pages (lazy-loaded Lightweight Charts, indicators in a Web Worker above 5), data health; ⌘K search; server-side queries only                                                            |
+| Package                | Role                                                                                                                                                                                                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/config`      | zod-validated env (`loadWorkerEnv`, `loadWebEnv`), secret redaction, production guards                                                                                                                                                                                                                                |
+| `packages/db`          | Kysely client (`@market/db`), migration runner and schema fingerprint (`/migrations`), security audit (`/security`), test databases (`/testing`), generated types                                                                                                                                                     |
+| `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                                                                                                                                                         |
+| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine, statement builder and SEC report parser (ADR-020)                                                                             |
+| `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                                                                                                                                               |
+| `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups                                                                                                                                |
+| `packages/screener`    | screen JSON schema, SQL compiler that emits only whitelisted identifiers and binds every value, independent oracle, presets, snapshot math (ADR-021)                                                                                                                                                                  |
+| `packages/alerts`      | alert condition schema, pure evaluator (crossings, % moves, upcoming earnings, cooldown) and wording shared by worker emails and the web page (ADR-022)                                                                                                                                                               |
+| `packages/portfolio`   | ledger replay (FIFO lots, splits, implicit deposits), TWR, XIRR, drawdown, benchmark index, CSV parsing and validation (ADR-023)                                                                                                                                                                                      |
+| `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                                                                                                                                                             |
+| `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, alert delivery (Resend), operator CLI                                                                                                                                                                                                     |
+| `apps/web`             | Next.js app for the owner: login, Markets dashboard (with watchlists and recent alerts), ticker pages (lazy-loaded Lightweight Charts, indicators in a Web Worker above 5; Financials tab), screener, watchlists (SSE), portfolio, calendar (.ics), heatmap, alerts, data health; ⌘K search; server-side queries only |
 
 Internal packages export TypeScript source. Vitest, tsx and Next.js (Turbopack) compile it directly, so there is no separate package build step.
 
@@ -41,11 +45,11 @@ Migrations live in `supabase/migrations` (forward-only). Each has a rollback in 
 
 ### Schemas
 
-| Schema   | Contents                                                                                                                                                                                                                                                                                                    | Access                                                  |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `market` | `data_providers`, `securities`, `security_symbol_history`, `provider_symbols`, `prices_daily` (+ partitions), `corporate_actions`, `adjustment_factors`, `prices_daily_adjusted` (view), `fundamentals_facts`, `filings`, `financial_statements`, `screener_snapshot`, `macro_series`, `macro_observations` | server/worker only                                      |
-| `ops`    | `data_ingestion_runs`, `data_corrections`, `data_quality_issues`, `provider_health`, `dataset_routing`, `alerts`                                                                                                                                                                                            | server/worker only                                      |
-| `public` | `watchlists`, `watchlist_items`, `saved_screens`, `portfolios`, `transactions`, `alerts`, `alert_events`, `audit_logs`: per-user rows (`user_id`) with RLS policies (own rows only; audit log read-only to clients)                                                                                         | owner only (server); RLS for a future multi-user deploy |
+| Schema   | Contents                                                                                                                                                                                                                                                                                                                                            | Access                                                  |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `market` | `data_providers`, `securities`, `security_symbol_history`, `provider_symbols`, `prices_daily` (+ partitions), `corporate_actions`, `adjustment_factors`, `prices_daily_adjusted` (view), `fundamentals_facts`, `filings`, `financial_statements`, `screener_snapshot`, `earnings_events`, `economic_releases`, `macro_series`, `macro_observations` | server/worker only                                      |
+| `ops`    | `data_ingestion_runs`, `data_corrections`, `data_quality_issues`, `provider_health`, `dataset_routing`, `alerts`                                                                                                                                                                                                                                    | server/worker only                                      |
+| `public` | `watchlists`, `watchlist_items`, `saved_screens`, `portfolios`, `transactions`, `alerts`, `alert_events`, `audit_logs`: per-user rows (`user_id`) with RLS policies (own rows only; audit log read-only to clients)                                                                                                                                 | owner only (server); RLS for a future multi-user deploy |
 
 `market` and `ops` are not in Supabase's API-exposed schema list, and client roles (`anon`, `authenticated`) have no `USAGE` on them. Every table, including every partition, has RLS enabled. `auditDatabaseSecurity()` checks all of this in CI and fails on any table without RLS, any client grant on a private schema, and any function a client role could execute.
 
@@ -103,26 +107,29 @@ Raw prints are never overwritten.
 
 ### Jobs and schedules
 
-| Queue                 | Jobs                                                                         |
-| --------------------- | ---------------------------------------------------------------------------- |
-| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod` |
-| `ingest-fundamentals` | `ingest-fundamentals`                                                        |
-| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out)                                 |
-| `ingest-macro`        | `ingest-macro`                                                               |
-| `maintenance`         | `recompute-adjustments`, `ensure-partitions`                                 |
-| `monitor`             | `staleness-monitor`                                                          |
-| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                          |
+| Queue                 | Jobs                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`        |
+| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                           |
+| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`                    |
+| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                                |
+| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`, `evaluate-alerts` |
+| `monitor`             | `staleness-monitor`                                                                 |
+| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                                 |
 
 `dueJobs(now)` is a pure function of the market calendar:
 
-| When (exchange time)                                                    | Job                    |
-| ----------------------------------------------------------------------- | ---------------------- |
-| every minute                                                            | staleness monitor      |
-| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out            |
-| 02:00                                                                   | reconcile              |
-| 03:00                                                                   | partitions             |
-| 18:00                                                                   | macro                  |
-| 21:00                                                                   | EDGAR sweep (off-peak) |
+| When (exchange time)                                                    | Job                                                 |
+| ----------------------------------------------------------------------- | --------------------------------------------------- |
+| every minute                                                            | staleness monitor                                   |
+| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out                                         |
+| 02:00                                                                   | reconcile                                           |
+| 03:00                                                                   | partitions                                          |
+| 06:30                                                                   | earnings (Finnhub key) and economic releases (FRED) |
+| 18:00                                                                   | macro                                               |
+| 18:45                                                                   | screener snapshot (after the 18:30 EOD deadline)    |
+| 18:50                                                                   | alert evaluation and email                          |
+| 21:00                                                                   | EDGAR sweep (off-peak)                              |
 
 Job ids are deterministic (`ingest-eod/2026-09-29/TEST_S001`), so re-dispatching is a no-op. Jobs retry 5 times with exponential backoff and jitter. Non-retryable provider errors (404, bad shape, license) become `UnrecoverableError`, and exhausted jobs go to the dead-letter queue.
 
@@ -155,6 +162,6 @@ The monitor opens a `staleness` alert on a breach and resolves it on recovery. R
 - Every record carries `source`, `source_symbol`, `fetched_at`, `as_of` and `license_tier`.
 - The env schema refuses the synthetic provider in production; the SAMPLE DATA banner shows wherever synthetic data exists.
 
-## Deferred beyond Phase 0
+## Deferred beyond Phase 1
 
-Intraday storage (`prices_intraday_1m`, pg_partman), `financial_statements`, insiders/13F/news/earnings, all user, billing and AI tables, least-privilege database roles for web and worker, a nonce-based CSP, OpenTelemetry/Sentry, deployment and IaC.
+Intraday storage (`prices_intraday_1m`, pg_partman) and live quotes, news, insiders and 13F, options, backtesting, AI features, billing and any multi-user or public product (ADR-015), least-privilege database roles for web and worker, a nonce-based CSP, OpenTelemetry/Sentry, and deployment (the optional private cloud deploy, plan group L, was not chosen).

@@ -265,7 +265,25 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
 
           <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
             <Card>
-              <CardHeader title="Holdings" description={`${report.positions.length} positions`} />
+              <CardHeader
+                title="Holdings"
+                description={
+                  <span className="flex flex-col gap-0.5">
+                    <span>
+                      {report.positions.length}{" "}
+                      {report.positions.length === 1 ? "position" : "positions"}
+                    </span>
+                    {source ? (
+                      <DataLabel
+                        source={sourceInfo(source)}
+                        kind="eod"
+                        asOf={session}
+                        fetchedAt={updated?.loadedAt ?? null}
+                      />
+                    ) : null}
+                  </span>
+                }
+              />
               <CardContent>
                 {report.positions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No open positions.</p>

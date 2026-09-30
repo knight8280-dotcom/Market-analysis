@@ -15,6 +15,7 @@ import type { Universe } from "./universe";
 export type WorkerEvent =
   | RoutingEvent
   | { type: "adjustments_recomputed"; securityId: string; at: Date }
+  | { type: "bars_updated"; securityId: string; date: string; source: ProviderId; at: Date }
   | {
       type: "alert_opened" | "alert_resolved";
       kind: string;

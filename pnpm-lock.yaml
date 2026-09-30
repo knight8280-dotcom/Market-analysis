@@ -68,6 +68,9 @@ importers:
       '@market/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      ioredis:
+        specifier: 6.0.0
+        version: 6.0.0
       lightweight-charts:
         specifier: 5.2.1
         version: 5.2.1

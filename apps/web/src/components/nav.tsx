@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@market/ui";
-import { Activity, Filter, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { Activity, Filter, LayoutDashboard, ListChecks, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Markets", icon: LayoutDashboard },
   { href: "/screener", label: "Screener", icon: Filter },
+  { href: "/watchlists", label: "Watchlists", icon: ListChecks },
   { href: "/admin/data-health", label: "Data health", icon: Activity },
 ];
 

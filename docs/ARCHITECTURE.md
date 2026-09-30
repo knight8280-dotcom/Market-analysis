@@ -16,7 +16,7 @@ Status: Phase 1 in progress (personal analytics app, ADR-015). The standing spec
 ```
 
 - **Postgres (Supabase, Postgres 17)** is the system of record. Local development and CI use stock `postgres:17` with a test-only shim for Supabase's roles.
-- **Redis** backs BullMQ, the SEC rate limiter and the `market-events` pub/sub channel. Phase 1 uses that channel for cache invalidation and SSE fan-out.
+- **Redis** backs BullMQ, the SEC and Tiingo rate limiters and the `market-events` pub/sub channel. The worker publishes `bars_updated` there after each end-of-day load; the web app holds one subscription per process and fans events out to open pages over server-sent events (`/api/stream`), at most one update per second per security.
 - Browsers never talk to a data provider (MUST-NOT #4). All provider access is in the worker; the web app reads only our database.
 
 ## Packages

@@ -2,6 +2,9 @@ import { sql } from "@market/db";
 import { afterEach, describe, expect, it } from "vitest";
 import { harness, StubPrimary, type Harness } from "./helpers/context";
 
+/** Routing and alert events; bars_updated (for live views) is covered by the ingest tests. */
+const routingEvents = (h: Harness) => h.events.filter((e) => e.type !== "bars_updated");
+
 /**
  * Phase 0 acceptance: "staleness alerts fire in a simulated outage". The primary price provider
  * (a stub standing in for Tiingo) goes down on 2026-09-29; the clock is 18:31 ET, one minute
@@ -86,8 +89,12 @@ describe("simulated outage", () => {
       { kind: "staleness", dataset: "daily_bars", severity: "critical" },
     ]);
     expect(alerts[1]!.message).toMatch(/EOD bars for 2026-09-29 missing: 0\/8/);
-    expect(h.events.map((e) => e.type)).toEqual(["alert_opened", "provider_failover"]);
-    expect(h.events[1]).toMatchObject({ dataset: "daily_bars", from: "tiingo", to: "synthetic" });
+    expect(routingEvents(h).map((e) => e.type)).toEqual(["alert_opened", "provider_failover"]);
+    expect(routingEvents(h)[1]).toMatchObject({
+      dataset: "daily_bars",
+      from: "tiingo",
+      to: "synthetic",
+    });
     expect(await route(h)).toMatchObject({ active_source: "synthetic", primary_source: "tiingo" });
 
     // The monitor asked the fallback for the missing session; run those jobs.
@@ -107,7 +114,7 @@ describe("simulated outage", () => {
     // Data is fresh again: the staleness alert resolves; the failover alert stays until failback.
     await h.run("staleness-monitor");
     expect((await openAlerts(h)).map((a) => a.kind)).toEqual(["failover"]);
-    expect(h.events.map((e) => e.type)).toContain("alert_resolved");
+    expect(routingEvents(h).map((e) => e.type)).toContain("alert_resolved");
 
     // Primary recovers: three healthy probes fail back.
     primary.failing = false;
@@ -117,7 +124,7 @@ describe("simulated outage", () => {
     await h.run("staleness-monitor");
     expect((await route(h)).active_source).toBe("tiingo");
     expect(await openAlerts(h)).toEqual([]);
-    expect(h.events.at(-1)).toMatchObject({
+    expect(routingEvents(h).at(-1)).toMatchObject({
       type: "provider_failback",
       dataset: "daily_bars",
       from: "synthetic",
@@ -139,7 +146,7 @@ describe("simulated outage", () => {
       ).rejects.toThrow();
     }
     expect((await route(h)).active_source).toBe("synthetic");
-    expect(h.events).toMatchObject([
+    expect(routingEvents(h)).toMatchObject([
       {
         type: "provider_failover",
         reason: expect.stringMatching(/3 consecutive failures/) as unknown,
@@ -211,6 +218,6 @@ describe("simulated outage", () => {
       .where("source", "=", "tiingo")
       .executeTakeFirstOrThrow();
     expect(after.consecutive_successes).toBe(1);
-    expect(h.events.filter((e) => e.type === "provider_failback")).toHaveLength(0);
+    expect(routingEvents(h).filter((e) => e.type === "provider_failback")).toHaveLength(0);
   });
 });

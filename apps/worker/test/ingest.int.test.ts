@@ -190,6 +190,13 @@ describe("EOD ingestion (20 synthetic securities, 10 years)", () => {
     ]);
   });
 
+  it("tells live views which securities got new bars", () => {
+    const updates = h.events.filter((e) => e.type === "bars_updated");
+    expect(updates.length).toBeGreaterThanOrEqual(18);
+    expect(updates[0]).toMatchObject({ source: "synthetic" });
+    expect(updates.every((e) => e.type === "bars_updated" && e.date <= "2025-12-31")).toBe(true);
+  });
+
   it("writes one run record per ingest with its counts", async () => {
     const runs = await h.t.db
       .selectFrom("ops.data_ingestion_runs")

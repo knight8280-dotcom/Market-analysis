@@ -120,6 +120,10 @@ The merge only inserts or corrects, so overlapping ranges are safe.
 3. Pass when the output's `httpStatusCounts` has no `403` or `429`, and `ops.data_ingestion_runs` shows 50 succeeded `fundamentals` runs.
 4. Afterwards, compare one `acceptanceDateTime` with the filing index page's "Accepted" time (`DATA_SOURCES.md`), and replace the hand-built fixtures with trimmed recordings. SEC data is public domain, so recordings may be committed.
 
+## Live updates
+
+Watchlists update in place when the worker loads new bars, if the web app has `REDIS_URL` (the same Redis as the worker; the root `.env` serves both). Without it the page says "Live updates off" and shows data as of page load.
+
 ## Screener
 
 - The snapshot rebuilds at 18:45 ET; to rebuild now: `pnpm worker screener` (a few seconds). The page shows the snapshot's as-of date.

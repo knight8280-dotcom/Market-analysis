@@ -47,6 +47,7 @@ export async function ingestEod(ctx: WorkerContext, raw: unknown) {
   });
   const counts = emptyCounts();
   const before = statusSnapshot(provider);
+  const changed = new Map<string, string>();
 
   try {
     const call = { route, source, dataset: "daily_bars" as const };
@@ -129,6 +130,10 @@ export async function ingestEod(ctx: WorkerContext, raw: unknown) {
       counts.rows_inserted += merged.inserted;
       counts.rows_updated += merged.updated;
       counts.rows_unchanged += merged.unchanged;
+      if (merged.inserted + merged.updated > 0) {
+        const latest = result.accepted.reduce((d, b) => (b.date > d ? b.date : d), "");
+        if (latest > (changed.get(securityId) ?? "")) changed.set(securityId, latest);
+      }
       // A corrected bar can change a dividend factor (it depends on the prior close).
       if (merged.updated > 0 && known.some((a) => a.cash_amount !== null))
         recompute.add(securityId);
@@ -148,6 +153,10 @@ export async function ingestEod(ctx: WorkerContext, raw: unknown) {
       httpStatusCounts: statusDelta(provider, before),
       at: ctx.clock(),
     });
+    // Live views (watchlists) refresh the securities whose bars changed.
+    for (const [securityId, date] of changed) {
+      await ctx.events.emit({ type: "bars_updated", securityId, date, source, at: ctx.clock() });
+    }
     return { runId, source, ...counts };
   } catch (err) {
     await finishRun(ctx.db, runId, {

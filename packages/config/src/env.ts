@@ -135,6 +135,8 @@ export const webEnvSchema = z.object({
   SESSION_SECRET: z
     .string()
     .min(32, "must be at least 32 characters (for example `openssl rand -base64 32`)"),
+  /** Optional: live watchlist updates subscribe to the worker's market-events channel. */
+  REDIS_URL: redisUrl.optional(),
   /** Host names the app answers to besides localhost, comma-separated (DNS-rebinding guard). */
   WEB_ALLOWED_HOSTS: z
     .string()

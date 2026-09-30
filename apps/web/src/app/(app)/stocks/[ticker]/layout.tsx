@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { StockTabs } from "../../../../components/stock-tabs";
+import { WatchlistMenu } from "../../../../components/watchlist-menu";
 import { requireOwner } from "../../../../server/auth/owner";
 import { db } from "../../../../server/db";
 import {
@@ -61,6 +62,9 @@ export default async function StockLayout({
             ) : null}
           </div>
           <p className="mt-1 text-muted-foreground">{security.name}</p>
+          <div className="mt-2">
+            <WatchlistMenu securityId={security.securityId} ticker={security.ticker} />
+          </div>
           {security.sector ? (
             <p className="mt-1 text-xs text-muted-foreground">
               {security.sicCode ? "Sector (SEC SIC)" : "Sector"}: {security.sector}

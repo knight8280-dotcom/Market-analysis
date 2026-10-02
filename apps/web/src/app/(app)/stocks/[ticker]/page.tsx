@@ -21,6 +21,8 @@ import {
 } from "../../../../lib/chart/catalog";
 import { requireOwner } from "../../../../server/auth/owner";
 import { db } from "../../../../server/db";
+import { drawingsFor } from "../../../../server/drawings";
+import { flagEnabled } from "../../../../server/flags";
 import { securityForTicker, tickerOf } from "../../../../server/stock";
 import {
   assertDisplayable,
@@ -69,11 +71,14 @@ export default async function StockPage({
         lastUpdated(database, source),
       ])
     : [[], null];
+  const drawings = (await flagEnabled("drawings")) ? await drawingsFor(security.securityId) : null;
   const info = source ? sourceInfo(source) : null;
 
   return (
     <div className="flex flex-col gap-6">
-      {bars.length > 0 ? <StockChart ticker={security.ticker} initial={initial} /> : null}
+      {bars.length > 0 ? (
+        <StockChart ticker={security.ticker} initial={initial} drawings={drawings} />
+      ) : null}
 
       {bars.length > 0 && info ? (
         <Card>

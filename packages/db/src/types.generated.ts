@@ -95,6 +95,23 @@ export interface BacktestRuns {
   user_id: string;
 }
 
+export interface ChartDrawings {
+  basis: string;
+  created_at: Generated<Timestamp>;
+  drawing_id: Generated<Int8>;
+  kind: string;
+  label: string | null;
+  points: Json;
+  security_id: Int8;
+  user_id: string;
+}
+
+export interface DashboardLayouts {
+  layout: Json;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface MarketAdjustmentFactors {
   computed_at: Generated<Timestamp>;
   dividend_factor: number;
@@ -518,6 +535,8 @@ export interface DB {
   audit_logs: AuditLogs;
   backtest_results: BacktestResults;
   backtest_runs: BacktestRuns;
+  chart_drawings: ChartDrawings;
+  dashboard_layouts: DashboardLayouts;
   "market.adjustment_factors": MarketAdjustmentFactors;
   "market.corporate_actions": MarketCorporateActions;
   "market.data_providers": MarketDataProviders;

@@ -33,6 +33,12 @@ export const FEATURE_FLAGS = {
       "In-app notifications when alerts fire, with snooze and delete; the bell in the header.",
     default: true,
   },
+  drawings: {
+    label: "Chart drawings",
+    description:
+      "Trend lines, horizontal lines, Fibonacci retracements, rectangles and text on ticker charts.",
+    default: true,
+  },
 } as const satisfies Record<string, FlagDefinition>;
 
 export type FlagKey = keyof typeof FEATURE_FLAGS;

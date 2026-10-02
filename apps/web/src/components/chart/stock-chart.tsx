@@ -13,7 +13,8 @@ import {
 } from "@market/ui";
 import type * as LightweightCharts from "lightweight-charts";
 import type { IChartApi, ISeriesApi, MouseEventParams, SeriesType, Time } from "lightweight-charts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { addDrawing, removeDrawing } from "../../app/(app)/stocks/[ticker]/drawing-actions";
 import {
   alignBenchmark,
   computeIndicators,
@@ -25,7 +26,16 @@ import {
   type IndicatorResults,
   type Timeframe,
 } from "../../lib/chart/catalog";
+import { DrawingsPrimitive } from "../../lib/chart/drawing-primitive";
+import {
+  DRAWING_LABELS,
+  POINTS,
+  type Drawing,
+  type DrawingKind,
+  type DrawingPoint,
+} from "../../lib/chart/drawings";
 import type { WorkerRequest, WorkerResponse } from "../../lib/chart/indicator.worker";
+import { DrawingList, DrawingToolbar, type NewDrawing } from "./drawing-tools";
 
 interface ChartData {
   ticker: string;
@@ -49,6 +59,12 @@ export interface ChartSettings {
 }
 
 type LC = typeof LightweightCharts;
+
+/** Where a click landed on the price pane: a bar index (fractional) and a price. */
+interface ChartPoint {
+  logical: number | null;
+  price: number | null;
+}
 let libPromise: Promise<LC> | null = null;
 /** The chart library loads only when a chart is shown (spec §6: charts lazy-loaded). */
 const loadLib = () => (libPromise ??= import("lightweight-charts"));
@@ -89,9 +105,19 @@ function isTyping(target: EventTarget | null): boolean {
  * Interactive price chart for one security (Phase 1 steps D2–D3): candles or line with volume,
  * split/dividend markers, timeframes ([ and ] step through them), raw or adjusted prices, and
  * indicator overlays and panes. More than WORKER_THRESHOLD indicators compute in a Web Worker.
- * A text summary and a data table give the same information without the canvas.
+ * A text summary and a data table give the same information without the canvas. With
+ * `drawings` (Phase 2 step F1), the owner draws on it and the drawings are saved.
  */
-export function StockChart({ ticker, initial }: { ticker: string; initial: ChartSettings }) {
+export function StockChart({
+  ticker,
+  initial,
+  drawings: initialDrawings = null,
+}: {
+  ticker: string;
+  initial: ChartSettings;
+  /** The owner's saved drawings; null when drawing tools are switched off. */
+  drawings?: Drawing[] | null;
+}) {
   const [settings, setSettings] = useState<ChartSettings>(initial);
   const [data, setData] = useState<ChartData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +130,16 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
   const chartRef = useRef<IChartApi | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const requestRef = useRef(0);
+  const [drawings, setDrawings] = useState<Drawing[]>(initialDrawings ?? []);
+  const [tool, setTool] = useState<DrawingKind | null>(null);
+  const [pending, setPending] = useState<DrawingPoint | null>(null);
+  const [textAt, setTextAt] = useState<DrawingPoint | null>(null);
+  const [drawMessage, setDrawMessage] = useState("");
+  const primitiveRef = useRef<DrawingsPrimitive | null>(null);
+  const shownRef = useRef<Drawing[]>([]);
+  const pendingRef = useRef<DrawingPoint | null>(null);
+  const toolRef = useRef<DrawingKind | null>(null);
+  const clickRef = useRef<(at: ChartPoint) => void>(() => {});
 
   const bars = useMemo(() => (data ? toBars(data) : null), [data]);
   const benchmark = useMemo(
@@ -191,11 +227,22 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
     [settings.indicators, results],
   );
 
+  const basis = settings.adjusted ? "adjusted" : "raw";
+  const shown = useMemo(() => drawings.filter((d) => d.basis === basis), [drawings, basis]);
+  // The chart keeps its drawings between rebuilds through shownRef. pendingRef is set wherever
+  // the first point changes, never from state here: an effect from an older render would
+  // overwrite a point a click has just placed.
+  useEffect(() => {
+    shownRef.current = shown;
+    primitiveRef.current?.set(shown, pending);
+  }, [shown, pending]);
+
   // Build the chart. Rebuilding on every change is simple and takes a few milliseconds.
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !bars || !data) return;
     let disposed = false;
+    let detachClicks = () => {};
     const started = performance.now();
     void loadLib().then((lc) => {
       if (disposed) return;
@@ -288,6 +335,42 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
         main,
         markers.map(({ date, ...m }) => ({ ...m, time: date as Time })),
       );
+      if (initialDrawings !== null) {
+        const primary = cssColor("--primary");
+        const primitive = new DrawingsPrimitive(bars.time, {
+          line: primary,
+          fill: withAlpha(primary, 0.12),
+          text: cssColor("--foreground"),
+          background: withAlpha(cssColor("--surface"), 0.85),
+        });
+        main.attachPrimitive(primitive);
+        primitive.set(shownRef.current, pendingRef.current);
+        primitiveRef.current = primitive;
+        // Native clicks, not subscribeClick: the library swallows a second click that comes within
+        // 500 ms of the first (it waits for a double click), so quick drawing would lose points.
+        let down: { x: number; y: number } | null = null;
+        const onDown = (e: PointerEvent) => {
+          down = { x: e.clientX, y: e.clientY };
+        };
+        const onClick = (e: MouseEvent) => {
+          // A drag pans the chart; only a click in place counts.
+          if (!down || Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) > 5) return;
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          if (x > chart.timeScale().width() || y > (chart.panes()[0]?.getHeight() ?? 0)) return;
+          clickRef.current({
+            logical: chart.timeScale().coordinateToLogical(x),
+            price: main.coordinateToPrice(y),
+          });
+        };
+        container.addEventListener("pointerdown", onDown);
+        container.addEventListener("click", onClick);
+        detachClicks = () => {
+          container.removeEventListener("pointerdown", onDown);
+          container.removeEventListener("click", onClick);
+        };
+      }
 
       const addLine = (
         values: (number | null)[],
@@ -370,11 +453,88 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
     });
     return () => {
       disposed = true;
+      detachClicks();
       delete container.dataset.ready;
+      primitiveRef.current = null;
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [bars, data, results, panes, settings.type, settings.tf, themeVersion]);
+  }, [bars, data, results, panes, settings.type, settings.tf, themeVersion, initialDrawings]);
+
+  const chooseTool = useCallback((next: DrawingKind | null) => {
+    // Refs change at once: a click that comes before React re-renders must see the new tool.
+    toolRef.current = next;
+    pendingRef.current = null;
+    setTool(next);
+    setPending(null);
+    setTextAt(null);
+    setDrawMessage(
+      next === null
+        ? ""
+        : POINTS[next] === 1
+          ? `${DRAWING_LABELS[next]}: click a point on the chart.`
+          : `${DRAWING_LABELS[next]}: click the first point on the chart.`,
+    );
+  }, []);
+
+  const saveDrawing = useCallback(
+    async (input: NewDrawing): Promise<string | null> => {
+      const res = await addDrawing(ticker, { ...input, basis });
+      if (!res.ok) {
+        setDrawMessage(res.error);
+        return res.error;
+      }
+      setDrawings((ds) => [...ds, res.drawing]);
+      toolRef.current = null;
+      pendingRef.current = null;
+      setTool(null);
+      setPending(null);
+      setTextAt(null);
+      setDrawMessage(`${DRAWING_LABELS[input.kind]} added.`);
+      return null;
+    },
+    [ticker, basis],
+  );
+
+  const deleteDrawing = useCallback(async (d: Drawing) => {
+    const res = await removeDrawing(d.id);
+    if (res.ok) {
+      setDrawings((ds) => ds.filter((x) => x.id !== d.id));
+      setDrawMessage(`${DRAWING_LABELS[d.kind]} deleted.`);
+    }
+  }, []);
+
+  // A click on the price pane places the active tool's next point, snapped to a session. The
+  // tool and the first point are read from refs, which change as soon as they are set.
+  useLayoutEffect(() => {
+    clickRef.current = ({ logical, price: value }: ChartPoint) => {
+      const tool = toolRef.current;
+      const pending = pendingRef.current;
+      if (!tool || !bars || logical === null || value === null || !(value > 0)) return;
+      const i = Math.min(bars.time.length - 1, Math.max(0, Math.round(logical)));
+      const point: DrawingPoint = { time: bars.time[i]!, price: Number(value.toPrecision(6)) };
+      if (tool === "text") {
+        setTextAt(point);
+        setDrawMessage("Type the label's text, then save it.");
+      } else if (POINTS[tool] === 2 && !pending) {
+        pendingRef.current = point;
+        setPending(point);
+        setDrawMessage(`${DRAWING_LABELS[tool]}: click the second point.`);
+      } else {
+        void saveDrawing({ kind: tool, points: pending ? [pending, point] : [point] });
+      }
+    };
+  });
+
+  // Escape puts the pen down.
+  useEffect(() => {
+    if (!tool) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") chooseTool(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tool, chooseTool]);
 
   const setTimeframe = useCallback((tf: Timeframe) => setSettings((s) => ({ ...s, tf })), []);
 
@@ -495,6 +655,22 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
         </details>
       </div>
 
+      {initialDrawings !== null ? (
+        <DrawingToolbar
+          tool={tool}
+          onTool={chooseTool}
+          textAt={textAt}
+          onSaveText={(text) => {
+            if (text && textAt) void saveDrawing({ kind: "text", points: [textAt], label: text });
+            else {
+              setTextAt(null);
+              setDrawMessage("");
+            }
+          }}
+          message={drawMessage}
+        />
+      ) : null}
+
       {bars && legendIndex >= 0 ? (
         <p className="flex flex-wrap gap-x-4 text-xs text-muted-foreground" aria-hidden>
           <span>{formatDate(bars.time[legendIndex])}</span>
@@ -533,7 +709,8 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
           <div
             ref={containerRef}
             data-testid="price-chart"
-            className="w-full overflow-hidden rounded-lg border"
+            data-drawings={shown.length}
+            className={cn("w-full overflow-hidden rounded-lg border", tool && "cursor-crosshair")}
             style={{ height: PRICE_PANE + panes.length * INDICATOR_PANE }}
           />
         </div>
@@ -565,6 +742,18 @@ export function StockChart({ ticker, initial }: { ticker: string; initial: Chart
             {COPY.chartAttribution}
           </a>
         </div>
+      ) : null}
+
+      {initialDrawings !== null && bars ? (
+        <DrawingList
+          drawings={shown}
+          hidden={drawings.length - shown.length}
+          otherBasis={settings.adjusted ? "raw (unadjusted)" : "adjusted"}
+          times={bars.time}
+          lastClose={bars.close.at(-1) ?? 0}
+          onAdd={saveDrawing}
+          onDelete={(d) => void deleteDrawing(d)}
+        />
       ) : null}
 
       {bars && visible ? (

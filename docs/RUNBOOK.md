@@ -170,6 +170,12 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - Ranking a sweep by Sharpe ratio needs T-bill rates (FRED `DTB3`, ingested when `FRED_ENABLED` is set); without them the builder ranks by CAGR.
 - `/settings` can turn Backtests off; runs and strategies are kept.
 
+## Chart drawings
+
+- On a ticker's chart, pick a tool (trend line, horizontal line, Fibonacci retracement, rectangle, text) and click the chart: one click for a horizontal line or text, two for the others. Escape or "Stop drawing" puts the pen down. "Drawings" under the chart lists them in words, deletes them, and adds one from typed dates and prices.
+- Drawings belong to the price basis they were drawn on: one made with "Adjusted" ticked shows only on the adjusted chart.
+- "Chart drawings" can be switched off on `/settings`; the drawings stay stored.
+
 ## Valuation
 
 - A ticker's **Valuation** tab: the DCF calculator starts from the latest filings where they exist (each input says where it came from) and from labelled assumptions for the rest; edit anything and the outputs and the sensitivity grid update at once. "Save these inputs" stores a scenario per security; "Load" puts it back.

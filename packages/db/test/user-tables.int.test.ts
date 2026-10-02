@@ -4,7 +4,7 @@ import { createTestDatabase, withRole, type TestDatabase } from "../src/testing"
 import { TEMPLATE } from "./global-setup";
 
 /**
- * Row-level security on the per-user tables (migrations 10, 13, 14 and 15): a signed-in user sees
+ * Row-level security on the per-user tables (migrations 10 and 13 to 16): a signed-in user sees
  * and changes only their own rows; anonymous clients see nothing; the audit log and backtest
  * results are read-only to clients.
  */
@@ -75,6 +75,14 @@ beforeAll(async () => {
        values ($1, $2, 'Fired', '/stocks/TEST_RLS')`,
       [user, event.rows[0]!.event_id],
     );
+    await t.pool.query(
+      `insert into public.chart_drawings (user_id, security_id, kind, basis, points)
+       values ($1, $2, 'horizontal', 'adjusted', '[{"time": "2026-09-30", "price": 100}]')`,
+      [user, securityId],
+    );
+    await t.pool.query(`insert into public.dashboard_layouts (user_id, layout) values ($1, '[]')`, [
+      user,
+    ]);
   }
 });
 afterAll(async () => {
@@ -101,6 +109,8 @@ describe("per-user tables", () => {
         "alerts",
         "alert_events",
         "notifications",
+        "chart_drawings",
+        "dashboard_layouts",
       ]) {
         expect(await count(c, table), table).toBe(1);
       }
@@ -241,6 +251,22 @@ describe("per-user tables", () => {
     ]) {
       await expect(link(bad), bad).rejects.toThrow(/check constraint/);
     }
+  });
+
+  it("keep drawings well-formed (migration 16)", async () => {
+    const draw = (kind: string, points: string, label: string | null = null) =>
+      t.pool.query(
+        `insert into public.chart_drawings (user_id, security_id, kind, basis, points, label)
+         values ($1, $2, $3, 'raw', $4::jsonb, $5)`,
+        [ALICE, securityId, kind, points, label],
+      );
+    const one = '[{"time": "2026-09-30", "price": 1}]';
+    await expect(draw("text", one, "Breakout")).resolves.toBeDefined();
+    await expect(draw("squiggle", one)).rejects.toThrow(/check constraint/);
+    await expect(draw("trendline", "[]")).rejects.toThrow(/check constraint/);
+    await expect(draw("trendline", `[${"{},".repeat(2)}{}]`)).rejects.toThrow(/check constraint/);
+    await expect(draw("horizontal", '{"time": "x"}')).rejects.toThrow(/check constraint/);
+    await expect(draw("text", one, "")).rejects.toThrow(/check constraint/);
   });
 
   it("give anonymous clients nothing", async () => {

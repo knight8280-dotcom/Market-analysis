@@ -36,4 +36,13 @@ export const COPY = {
   chartAttributionUrl: "https://www.tradingview.com/",
   adjusted: (adjusted: boolean) =>
     adjusted ? "Adjusted for splits and dividends" : "As traded (not adjusted)",
+  /** §12 backtest disclosure, verbatim, shown above results. */
+  backtestDisclosure: (a: { commissions: string; slippage: string; fills: string }) =>
+    `Hypothetical results. These results are based on a simulated backtest using historical data and the assumptions shown (commissions ${a.commissions}, slippage ${a.slippage}, fills at ${a.fills}). They do not represent actual trading, may not reflect the impact of market factors such as liquidity, and benefit from hindsight. Past performance, actual or hypothetical, does not guarantee future results. This tool does not recommend any strategy.`,
+  /** The same disclosure for a list of runs, each with its own assumptions. */
+  backtestListDisclosure:
+    "Hypothetical results. These results are based on simulated backtests using historical data and the assumptions shown on each run's page (commissions, slippage, fills). They do not represent actual trading, may not reflect the impact of market factors such as liquidity, and benefit from hindsight. Past performance, actual or hypothetical, does not guarantee future results. This tool does not recommend any strategy.",
+  /** Above a sweep's best combination: it was picked with hindsight. */
+  sweepBest: (combinations: number, objective: string) =>
+    `Best of ${combinations} parameter combinations by ${objective}, picked with hindsight on the same data. A choice made this way usually does worse on data it was not picked on; see a walk-forward run for an out-of-sample record.`,
 } as const;

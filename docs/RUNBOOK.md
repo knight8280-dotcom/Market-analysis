@@ -157,6 +157,15 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - If a holding shows "valued at cost", its prices are not loaded (add the ticker to `config/universe.json` and backfill).
 - Regenerate the reference fixture after changing a convention: `python3 packages/portfolio/scripts/make_fixture.py`, then `pnpm --filter @market/portfolio test`.
 
+## Backtests
+
+- `/backtests` → "New backtest": pick an example or build rules, set costs, choose a single run (optional out-of-sample split date), a parameter sweep or a walk-forward, and run. Type `$name` in a number field to make it a parameter. The JSON view edits the whole request, nested rule groups included.
+- **Runs need the worker.** The page shows "Waiting for the worker…" until it picks the run up (within 3 seconds while `pnpm --filter @market/worker start` runs). Without the long-running worker, run queued backtests once with `pnpm worker backtests`; `pnpm worker backtest --run <id>` re-runs one in place.
+- Each run executes in a worker thread with a 10-minute limit (ADR-025). A run that hits it fails with "ran past its time limit": narrow the universe, the period or the number of combinations. A run left "running" after the worker stopped is marked failed on the next start; use "Run again".
+- **Reproducibility:** every finished run shows its code version and data fingerprint. "Run again" queues the same request; its page says whether earlier runs of that request saw the same data. A different fingerprint means prices were added or corrected in between.
+- Ranking a sweep by Sharpe ratio needs T-bill rates (FRED `DTB3`, ingested when `FRED_ENABLED` is set); without them the builder ranks by CAGR.
+- `/settings` can turn Backtests off; runs and strategies are kept.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

@@ -146,7 +146,13 @@ Every new feature ships behind a feature flag (a small table and a settings page
 
 Approved 2026-10-02 with the defaults, except push notifications on mobile and desktop.
 
-| Group | Status      |
-| ----- | ----------- |
-| A–G   | not started |
-| H–L   | not started |
+| Group                      | Status                                                                                                                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A Feature flags            | done 2026-10-02: flag registry with database overrides, `/settings` (ADR-024)                                                                                        |
+| B Backtesting              | done 2026-10-02: engine, metrics and validation (46 unit tests), migration 13, worker runs in a thread (15 integration tests), builder and reports (3 E2E) (ADR-025) |
+| C Portfolio risk           | not started                                                                                                                                                          |
+| D Valuation                | not started                                                                                                                                                          |
+| E Alerts and notifications | not started                                                                                                                                                          |
+| F Drawings and dashboard   | not started                                                                                                                                                          |
+| G 2a acceptance            | not started                                                                                                                                                          |
+| H–L (2b)                   | not started                                                                                                                                                          |

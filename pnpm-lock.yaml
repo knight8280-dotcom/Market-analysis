@@ -47,6 +47,9 @@ importers:
       '@market/alerts':
         specifier: workspace:*
         version: link:../../packages/alerts
+      '@market/backtest':
+        specifier: workspace:*
+        version: link:../../packages/backtest
       '@market/calendar':
         specifier: workspace:*
         version: link:../../packages/calendar

@@ -36,6 +36,9 @@ export interface RunOutcome {
   dataSnapshotId?: string;
 }
 
+const SHARPE_NEEDS_RATES =
+  "the Sharpe ratio needs the 3-month T-bill rate (FRED DTB3) for the whole period, and it is not stored; choose by CAGR, Calmar or total return, or load FRED data";
+
 /** Headline figures stored with the results, for run lists. */
 export interface RunSummary {
   totalReturn: number | null;
@@ -105,9 +108,12 @@ async function compute(db: Database, checked: CheckedRequest, opts: ExecuteOptio
         deadline,
       );
       if (!result.best) {
-        const reason = result.rows.find((r) => r.error)?.error;
         throw new BacktestError(
-          `no combination gave a ${request.objective.replace("_", " ")}${reason ? ` (${reason})` : ""}`,
+          `no combination could be ranked: ${
+            request.objective === "sharpe" && result.rows.some((r) => r.summary)
+              ? SHARPE_NEEDS_RATES
+              : (result.rows.find((r) => r.error)?.error ?? "none produced results")
+          }`,
         );
       }
       const report = runBacktest(resolveStrategy(request.strategy, result.best.values), data, {
@@ -140,7 +146,11 @@ async function compute(db: Database, checked: CheckedRequest, opts: ExecuteOptio
         request.testMonths,
         deadline,
       );
-      if (!wf.metrics) throw new BacktestError("no test window produced results");
+      if (!wf.metrics) {
+        throw new BacktestError(
+          `no test window produced results${request.objective === "sharpe" ? `; ${SHARPE_NEEDS_RATES}` : ""}`,
+        );
+      }
       const summary: RunSummary = {
         totalReturn: wf.metrics.totalReturn,
         cagr: wf.metrics.cagr,

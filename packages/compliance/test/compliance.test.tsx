@@ -1,7 +1,7 @@
 import { TooltipProvider } from "@market/ui/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { COPY, DisclaimerFooter, StaleDataBanner } from "../src";
+import { COPY, DisclaimerFooter, HypotheticalDisclosure, StaleDataBanner } from "../src";
 import { DataLabel } from "../src/client";
 
 const tiingo = {
@@ -46,5 +46,21 @@ describe("DisclaimerFooter", () => {
     const html = renderToStaticMarkup(<DisclaimerFooter brand="Market Analysis" />);
     expect(html).toContain("Market Analysis provides financial data and analytics");
     expect(html).toContain("Market Analysis is not a registered broker-dealer");
+  });
+});
+
+describe("backtest disclosure (spec §12)", () => {
+  it("fills in the run's assumptions and is shown as a note", () => {
+    const text = COPY.backtestDisclosure({
+      commissions: "$1.00 per trade",
+      slippage: "5 bps",
+      fills: "the next session's open",
+    });
+    expect(text).toBe(
+      "Hypothetical results. These results are based on a simulated backtest using historical data and the assumptions shown (commissions $1.00 per trade, slippage 5 bps, fills at the next session's open). They do not represent actual trading, may not reflect the impact of market factors such as liquidity, and benefit from hindsight. Past performance, actual or hypothetical, does not guarantee future results. This tool does not recommend any strategy.",
+    );
+    const html = renderToStaticMarkup(<HypotheticalDisclosure>{text}</HypotheticalDisclosure>);
+    expect(html).toContain('role="note"');
+    expect(html).toContain("This tool does not recommend any strategy.");
   });
 });

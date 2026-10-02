@@ -20,7 +20,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ImportForm } from "../../../components/portfolio/import-form";
-import { PerformanceChart } from "../../../components/portfolio/performance-chart";
+import { PerformanceChart } from "../../../components/performance-chart";
 import { TransactionForm } from "../../../components/portfolio/tx-form";
 import { requireOwner } from "../../../server/auth/owner";
 import { db } from "../../../server/db";

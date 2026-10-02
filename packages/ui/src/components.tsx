@@ -104,9 +104,20 @@ export function Badge({
   return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
 }
 
-export function Table({ className, ...props }: ComponentProps<"table">) {
+/**
+ * A table that scrolls sideways when it does not fit. Wide tables pass `scrollLabel`, which
+ * makes the scrolling area a focusable, named region so it can be scrolled from the keyboard.
+ */
+export function Table({
+  className,
+  scrollLabel,
+  ...props
+}: ComponentProps<"table"> & { scrollLabel?: string }) {
   return (
-    <div className="w-full overflow-x-auto">
+    <div
+      className="w-full overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+      {...(scrollLabel ? { tabIndex: 0, role: "region", "aria-label": scrollLabel } : {})}
+    >
       <table className={cn("w-full border-collapse text-sm", className)} {...props} />
     </div>
   );

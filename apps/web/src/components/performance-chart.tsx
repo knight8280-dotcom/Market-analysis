@@ -23,7 +23,7 @@ function path(
 }
 
 /**
- * Cumulative time-weighted return of the portfolio against its benchmark (a static SVG; the
+ * Cumulative return of a portfolio or a backtest against its benchmark (a static SVG; the
  * summary above it carries the same numbers for screen readers).
  */
 export function PerformanceChart({
@@ -31,12 +31,17 @@ export function PerformanceChart({
   portfolio,
   benchmark,
   benchmarkLabel,
+  label = "Portfolio",
+  legend = "Portfolio (time-weighted)",
 }: {
   dates: readonly string[];
   /** Growth of 1. */
   portfolio: readonly number[];
   benchmark: readonly (number | null)[] | null;
   benchmarkLabel: string | null;
+  /** Name of the main series in the accessible summary, and its legend entry. */
+  label?: string;
+  legend?: string;
 }) {
   if (dates.length < 2) return null;
   const all = [...portfolio, ...(benchmark ?? []).filter((v): v is number => v !== null)].map(
@@ -59,7 +64,7 @@ export function PerformanceChart({
   const y = (v: number) => PAD.t + ((hi - (v - 1)) / (hi - lo)) * (H - PAD.t - PAD.b);
   const last = portfolio.at(-1)! - 1;
   const benchLast = benchmark?.at(-1);
-  const summary = `Portfolio ${formatPercent(last)} from ${formatDate(dates[0])} to ${formatDate(dates.at(-1))}${
+  const summary = `${label} ${formatPercent(last)} from ${formatDate(dates[0])} to ${formatDate(dates.at(-1))}${
     benchmark && benchmarkLabel && typeof benchLast === "number"
       ? `; ${benchmarkLabel} ${formatPercent(benchLast - 1)}`
       : ""
@@ -116,8 +121,7 @@ export function PerformanceChart({
       </svg>
       <figcaption className="flex flex-wrap gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="inline-block h-0.5 w-5 bg-primary" /> Portfolio
-          (time-weighted)
+          <span aria-hidden className="inline-block h-0.5 w-5 bg-primary" /> {legend}
         </span>
         {benchmark && benchmarkLabel ? (
           <span className="flex items-center gap-1.5">

@@ -13,7 +13,7 @@ export const FEATURE_FLAGS = {
   backtests: {
     label: "Backtests",
     description: "Strategy builder, backtest runs and their reports.",
-    default: false,
+    default: true,
   },
 } as const satisfies Record<string, FlagDefinition>;
 

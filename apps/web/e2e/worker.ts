@@ -61,6 +61,27 @@ export async function runAlertsJob(resendUrl: string): Promise<string> {
   return stdout;
 }
 
+/** Runs every queued backtest once with `pnpm worker backtests`, as the worker's poll would. */
+export async function runBacktestsJob(): Promise<string> {
+  const { stdout } = await promisify(execFile)(
+    "pnpm",
+    ["--silent", "--filter", "@market/worker", "run", "cli", "backtests"],
+    {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        APP_ENV: "test",
+        DATABASE_URL,
+        REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
+        DATA_PROVIDER_PRIMARY: "synthetic",
+        LOG_LEVEL: "warn",
+      },
+      timeout: 120_000,
+    },
+  );
+  return stdout;
+}
+
 /**
  * A price level strictly between a ticker's last two closes (the earlier one in the later one's
  * split basis), so a crossing alert at that level fires on the latest bar.

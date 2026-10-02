@@ -39,6 +39,20 @@ export function StaleDataBanner(props: { items: { dataset: string; since: string
   );
 }
 
+/** §12 hypothetical-results disclosure: above backtest results, never collapsed. */
+export function HypotheticalDisclosure({ children }: { children: string }) {
+  return (
+    <div
+      role="note"
+      aria-label="Hypothetical results disclosure"
+      className="flex gap-2 rounded-lg border border-warning/60 bg-warning/10 px-4 py-3 text-sm leading-relaxed"
+    >
+      <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0 text-warning" />
+      <p>{children}</p>
+    </div>
+  );
+}
+
 /** §12 global footer. */
 export function DisclaimerFooter(props: { brand: string }) {
   return (

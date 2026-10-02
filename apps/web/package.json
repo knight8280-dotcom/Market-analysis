@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@market/alerts": "workspace:*",
+    "@market/backtest": "workspace:*",
     "@market/calendar": "workspace:*",
     "@market/compliance": "workspace:*",
     "@market/config": "workspace:*",

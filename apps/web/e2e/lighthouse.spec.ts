@@ -42,6 +42,10 @@ test("ticker page LCP under 2.5 s in Lighthouse", async ({ baseURL }) => {
       cls: audits["cumulative-layout-shift"]?.numericValue,
       score: result?.lhr.categories.performance?.score,
       finalUrl: result?.lhr.finalDisplayedUrl,
+      // Why a metric is missing, when one is (Lighthouse reports rather than throws).
+      runtimeError: result?.lhr.runtimeError?.code,
+      lcpError: audits["largest-contentful-paint"]?.errorMessage,
+      warnings: result?.lhr.runWarnings,
     };
     test.info().annotations.push({ type: "lighthouse", description: JSON.stringify(report) });
     process.stdout.write(`lighthouse ${JSON.stringify(report)}\n`);

@@ -295,6 +295,37 @@ describe("runs", () => {
     expect((await runOf(invalid)).error).toMatch(/sizing\.maxPositions/);
   });
 
+  it("explains that ranking by Sharpe ratio needs T-bill rates", async () => {
+    const swept = strategy({
+      entry: {
+        combine: "all",
+        rules: [
+          {
+            left: { kind: "price", field: "close" },
+            op: ">",
+            right: { kind: "indicator", id: "sma", params: { period: { $param: "n" } } },
+          },
+        ],
+      },
+      start: "2020-01-02",
+      end: "2020-12-31",
+    });
+    await sql`delete from market.macro_observations where series_id = 'DTB3'`.execute(h.t.db);
+    try {
+      const id = await queue(
+        { kind: "sweep", strategy: swept, params: { n: [10, 20] }, objective: "sharpe" },
+        "sweep",
+      );
+      await h.run("run-backtest", { runId: id });
+      expect((await runOf(id)).error).toMatch(/Sharpe ratio needs the 3-month T-bill rate/);
+    } finally {
+      await sql`
+        insert into market.macro_observations (series_id, date, value, realtime_start)
+        values ('DTB3', '2020-01-02', 1.5, '2020-01-02'), ('DTB3', '2021-01-04', 0.08, '2021-01-04')
+      `.execute(h.t.db);
+    }
+  });
+
   it("skips a run that is no longer queued", async () => {
     const id = await queue({ kind: "single", strategy: strategy() });
     await h.t.db

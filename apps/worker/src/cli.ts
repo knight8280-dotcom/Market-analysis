@@ -1,3 +1,4 @@
+import { codeVersion } from "@market/backtest/snapshot";
 import { latestClosedSession } from "@market/calendar";
 import { loadWorkerEnv } from "@market/config";
 import { createDb, createPool } from "@market/db";
@@ -14,6 +15,7 @@ import { TiingoProvider } from "@market/market-data/adapters/tiingo";
 import { Redis } from "ioredis";
 import type { JobRequest, WorkerContext } from "./context";
 import { InlineDispatcher } from "./dispatch";
+import { gitSha, inProcessRunner } from "./backtest/runner";
 import { dispatchQueuedBacktests } from "./jobs/backtest";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { runJob } from "./jobs/index";
@@ -110,6 +112,7 @@ async function main(): Promise<void> {
     dispatch: dispatcher,
     universe,
     alertDelivery: alertDeliveryFromEnv(env),
+    backtests: inProcessRunner(db, { codeVersion: codeVersion(gitSha()) }),
   };
   const source = flag("source") ? ProviderId.parse(flag("source")) : undefined;
   const failures: { job: string; error: string }[] = [];

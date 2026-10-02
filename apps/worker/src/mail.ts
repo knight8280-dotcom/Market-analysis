@@ -98,5 +98,6 @@ export function alertDeliveryFromEnv(env: WorkerEnv): AlertDelivery {
     to: env.ALERT_EMAIL_TO ?? null,
     from: env.ALERT_EMAIL_FROM,
     dailyCap: env.ALERT_DAILY_CAP,
+    appUrl: env.APP_BASE_URL,
   };
 }

@@ -1,3 +1,4 @@
+import { BAR_KINDS } from "@market/alerts";
 import { isTradingDay, previousTradingDay, type IsoDate } from "@market/calendar";
 import {
   ProviderId,
@@ -8,6 +9,7 @@ import {
 import { z } from "zod";
 import type { WorkerContext } from "../context";
 import { statusDelta, statusSnapshot } from "../http-stats";
+import { queueAlertEvaluation } from "./alerts";
 import { JOBS, jobId } from "../queues";
 import { actionsFor, upsertActions } from "../repo/actions";
 import { mergeDailyBars, previousClose } from "../repo/prices";
@@ -157,6 +159,13 @@ export async function ingestEod(ctx: WorkerContext, raw: unknown) {
     for (const [securityId, date] of changed) {
       await ctx.events.emit({ type: "bars_updated", securityId, date, source, at: ctx.clock() });
     }
+    // Alerts on these securities are checked now rather than at 18:50 (Phase 2 step E2).
+    await queueAlertEvaluation(ctx, {
+      trigger: "bars",
+      runId,
+      securityIds: [...changed.keys()],
+      kinds: BAR_KINDS,
+    });
     return { runId, source, ...counts };
   } catch (err) {
     await finishRun(ctx.db, runId, {

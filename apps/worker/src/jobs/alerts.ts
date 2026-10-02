@@ -1,13 +1,37 @@
-import { describeAlert, evaluateAlert, parseAlert } from "@market/alerts";
+import {
+  ALERT_KINDS,
+  describeAlert,
+  evaluateAlert,
+  parseAlert,
+  parseState,
+  PHASE2_KINDS,
+  screenFingerprint,
+  SERIES_KINDS,
+  type AlertDefinition,
+  type AlertKind,
+  type DailySeries,
+  type Evaluation,
+  type FilingItem,
+  type LatestBar,
+  type ScreenResults,
+  type UpcomingEarnings,
+} from "@market/alerts";
 import { marketDateOf } from "@market/calendar";
-import { OWNER_USER_ID } from "@market/config";
+import { OWNER_USER_ID, resolveFlags } from "@market/config";
 import { sql } from "@market/db";
 import { licenseFor, ProviderId } from "@market/market-data";
+import { Screen, screenMembers } from "@market/screener";
 import { z } from "zod";
 import type { WorkerContext } from "../context";
-import { JOBS } from "../queues";
+import { JOBS, jobId } from "../queues";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
 import { routeFor } from "../routing";
+
+const DEFAULT_APP_URL = "http://localhost:3000";
+/** Calendar days of adjusted bars for indicator and volume conditions (about 550 sessions). */
+const SERIES_DAYS = 800;
+const TRIGGERS = ["schedule", "bars", "filings", "screener", "manual"] as const;
+type Trigger = (typeof TRIGGERS)[number];
 
 const Input = z.object({
   /** Evaluate the latest bar on or before this date (default: the latest bar). */
@@ -15,6 +39,15 @@ const Input = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  /** Only alerts on these securities (runs prompted by new bars or filings). */
+  securityIds: z
+    .array(z.string().regex(/^\d{1,18}$/))
+    .max(5000)
+    .optional(),
+  /** Only alerts of these kinds. */
+  kinds: z.array(z.enum(ALERT_KINDS)).optional(),
+  /** What prompted the run, kept with its run record. */
+  trigger: z.enum(TRIGGERS).default("schedule"),
 });
 
 interface AlertRow {
@@ -22,26 +55,41 @@ interface AlertRow {
   user_id: string;
   kind: string;
   params: unknown;
+  state: unknown;
   cooldown_hours: number;
   last_fired_at: Date | null;
-  ticker: string;
-  date: string | null;
-  close: number | null;
-  prev_date: string | null;
-  prev_close: number | null;
-  earnings_date: string | null;
-  earnings_hour: string | null;
+  snoozed_until: Date | null;
+  created_at: Date;
+  security_id: string | null;
+  ticker: string | null;
+  cik: string | null;
+  screen_id: string | null;
+  screen_name: string | null;
+  screen_definition: unknown;
+}
+
+const isPhase2 = (kind: AlertKind) => (PHASE2_KINDS as readonly AlertKind[]).includes(kind);
+
+/** Notification links: a path in the app or a filing on www.sec.gov (the table checks it too). */
+function safeHref(href: string | null): string | null {
+  if (!href) return null;
+  return /^\/[^/\\]/.test(href) || href.startsWith("https://www.sec.gov/") ? href : null;
 }
 
 /**
- * Evaluates every active alert against the latest end-of-day bar and upcoming earnings, then
- * emails new events to the owner (Phase 1 steps I2 and I3).
+ * Evaluates active alerts against the latest end-of-day bars, adjusted series, upcoming
+ * earnings, newly stored filings and saved screens' results; records each new event with an
+ * in-app notification, then emails new events to the owner (Phase 1 steps I2 and I3, Phase 2
+ * steps E1 to E3).
  *
- * - Idempotent: an event is unique per (alert, bar date), or per (alert, report date) for
- *   earnings, so re-running never fires twice.
- * - Delivery is separate from firing: events start "pending" and become "sent", "failed" (retried
- *   by the job's own retries within a day) or "suppressed" (no email configured, or over the
- *   daily cap). Resend's idempotency key stops a retry from sending a second copy.
+ * - Runs at 18:50 ET for everything, and within seconds of new data for the alerts that data
+ *   concerns: after an end-of-day load, a filings refresh or a screener rebuild (step E2).
+ * - Idempotent: an event is unique per (alert, key), so re-running never fires twice.
+ * - Delivery is separate from firing: events start "pending" and become "sent", "failed"
+ *   (retried by the job's own retries within a day) or "suppressed" (no email configured, or
+ *   over the daily cap). Resend's idempotency key stops a retry from sending a second copy.
+ * - The Phase 2 kinds are evaluated only while the `alert_types` flag is on, and notifications
+ *   are written only while the `notifications` flag is on.
  */
 export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
   const input = Input.parse(raw ?? {});
@@ -60,101 +108,155 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
   });
   const counts = emptyCounts();
   try {
+    const flags = resolveFlags(
+      await ctx.db.selectFrom("ops.feature_flags").select(["key", "enabled"]).execute(),
+    );
     const rows = await sql<AlertRow>`
-      select a.alert_id::text, a.user_id::text, a.kind, a.params, a.cooldown_hours,
-        a.last_fired_at, s.ticker, t.date, t.close::float8 as close, y.date as prev_date,
-        y.close::float8 * coalesce(fy.split_factor, 1) / coalesce(ft.split_factor, 1) as prev_close,
-        e.report_date as earnings_date, e.hour as earnings_hour
+      select a.alert_id::text, a.user_id::text, a.kind, a.params, a.state, a.cooldown_hours,
+        a.last_fired_at, a.snoozed_until, a.created_at, a.security_id::text, s.ticker, s.cik,
+        a.screen_id::text, sc.name as screen_name, sc.definition as screen_definition
       from public.alerts a
-      join market.securities s using (security_id)
-      left join lateral (
-        select p.date, p.close from market.prices_daily p
-        where p.security_id = s.security_id and p.source = ${source} and p.date <= ${through}::date
-        order by p.date desc limit 1
-      ) t on true
-      left join lateral (
-        select p.date, p.close from market.prices_daily p
-        where p.security_id = s.security_id and p.source = ${source} and p.date < t.date
-        order by p.date desc limit 1
-      ) y on true
-      left join lateral (
-        select af.split_factor from market.adjustment_factors af
-        where af.security_id = s.security_id and af.ex_date > t.date
-        order by af.ex_date limit 1
-      ) ft on true
-      left join lateral (
-        select af.split_factor from market.adjustment_factors af
-        where af.security_id = s.security_id and af.ex_date > y.date
-        order by af.ex_date limit 1
-      ) fy on true
-      left join lateral (
-        select ee.report_date, ee.hour from market.earnings_events ee
-        where ee.security_id = s.security_id and ee.report_date > ${today}::date
-        order by ee.report_date limit 1
-      ) e on true
+      left join market.securities s on s.security_id = a.security_id
+      left join public.saved_screens sc on sc.screen_id = a.screen_id
       where a.active
+        ${input.securityIds ? sql`and a.security_id = any(${input.securityIds}::bigint[])` : sql``}
+        ${input.kinds ? sql`and a.kind = any(${input.kinds}::text[])` : sql``}
       order by a.alert_id
     `.execute(ctx.db);
     counts.rows_fetched = rows.rows.length;
 
+    const alerts = rows.rows.map((row) => ({ row, def: parseAlert(row.kind, row.params) }));
+    const securitiesFor = (kinds: readonly AlertKind[]) => [
+      ...new Set(
+        alerts.flatMap(({ row, def }) =>
+          def && row.security_id && kinds.includes(def.kind) ? [row.security_id] : [],
+        ),
+      ),
+    ];
+    const seriesKinds = flags.alert_types ? SERIES_KINDS : [];
+    const [bars, earnings, series] = await Promise.all([
+      latestBars(ctx, source, securitiesFor(["price_above", "price_below", "pct_move"]), through),
+      upcomingEarnings(ctx, securitiesFor(["earnings_upcoming"]), today),
+      adjustedSeries(ctx, source, securitiesFor(seriesKinds), through, today),
+    ]);
+    const screens = new Map<string, ScreenResults | null>();
+
     const attribution = licenseFor(source).attribution.text;
     const sample = source === "synthetic";
-    const outcome = { fired: 0, notMet: 0, cooldown: 0, noData: 0, invalid: 0, duplicate: 0 };
-    for (const r of rows.rows) {
-      const def = parseAlert(r.kind, r.params);
+    const appUrl = ctx.alertDelivery?.appUrl ?? DEFAULT_APP_URL;
+    const outcome = {
+      fired: 0,
+      notMet: 0,
+      cooldown: 0,
+      snoozed: 0,
+      baseline: 0,
+      noData: 0,
+      invalid: 0,
+      disabled: 0,
+      duplicate: 0,
+    };
+    for (const { row: r, def } of alerts) {
       if (!def) {
         outcome.invalid++;
         continue;
       }
+      if (isPhase2(def.kind) && !flags.alert_types) {
+        outcome.disabled++;
+        continue;
+      }
+      const sid = r.security_id;
+      const state = parseState(r.state);
       const result = evaluateAlert(def, {
-        ticker: r.ticker,
-        bar:
-          r.date && r.close !== null
-            ? { date: r.date, close: r.close, prevDate: r.prev_date, prevClose: r.prev_close }
+        ticker: r.ticker ?? "",
+        bar: sid ? (bars.get(sid) ?? null) : null,
+        earnings: sid ? (earnings.get(sid) ?? null) : null,
+        series: sid ? (series.get(sid) ?? null) : null,
+        filings:
+          def.kind === "new_filing" && r.cik
+            ? await storedFilings(ctx, r.cik, r.created_at, state.filingsSeenThrough)
             : null,
-        earnings: r.earnings_date ? { date: r.earnings_date, hour: r.earnings_hour } : null,
+        screen: def.kind === "screen_membership" ? await screenResults(ctx, r, screens) : null,
         today,
         now,
         lastFiredAt: r.last_fired_at,
         cooldownHours: r.cooldown_hours,
+        snoozedUntil: r.snoozed_until,
+        state,
       });
       if (!result.fire) {
         if (result.reason === "cooldown") outcome.cooldown++;
+        else if (result.reason === "snoozed") outcome.snoozed++;
+        else if (result.reason === "baseline") outcome.baseline++;
         else if (result.reason === "no_data") outcome.noData++;
         else outcome.notMet++;
+        if (result.state) {
+          await ctx.db
+            .updateTable("alerts")
+            .set({ state: JSON.stringify(result.state) })
+            .where("alert_id", "=", r.alert_id)
+            .execute();
+        }
         continue;
       }
+
+      const dataLine = sourceLine(def, result, attribution);
+      const sampleLine = sample
+        ? "SAMPLE DATA: this environment uses synthetic prices, not real market data."
+        : null;
+      const subject = `${sample ? "[SAMPLE DATA] " : ""}${result.subject}`;
+      const watched =
+        def.kind === "screen_membership"
+          ? `screen “${r.screen_name ?? "?"}”: ${describeAlert(def)}`
+          : `${r.ticker}: ${describeAlert(def)}`;
       const footer = [
-        def.kind === "earnings_upcoming"
-          ? "Earnings dates: Finnhub (personal use)."
-          : `End-of-day data as of ${r.date}. ${attribution}.`,
-        sample
-          ? "SAMPLE DATA: this environment uses synthetic prices, not real market data."
-          : null,
-        `Your alert: ${r.ticker}, ${describeAlert(def).toLowerCase()}. Manage alerts under Alerts in Market Analysis.`,
+        dataLine,
+        sampleLine,
+        `Your alert on ${watched}.`,
+        `Manage this alert (snooze, pause or delete): ${appUrl}/alerts/${r.alert_id}`,
+        flags.notifications ? `All notifications: ${appUrl}/notifications` : null,
         "Informational only; not investment advice.",
       ].filter(Boolean);
-      const subject = `${sample ? "[SAMPLE DATA] " : ""}${result.subject}`;
       const message = `${subject}\n\n${result.text}\n\n${footer.join("\n")}`;
+      const body = [result.summary ?? result.text, "", dataLine, sampleLine]
+        .filter((l) => l !== null)
+        .join("\n");
+
       const inserted = await ctx.db.transaction().execute(async (trx) => {
         const event = await trx
           .insertInto("alert_events")
           .values({
             alert_id: r.alert_id,
             user_id: r.user_id,
-            bar_date: result.key,
+            bar_date: result.date,
+            event_key: result.key,
             message,
             fired_at: now,
           })
-          .onConflict((oc) => oc.columns(["alert_id", "bar_date"]).doNothing())
+          .onConflict((oc) => oc.columns(["alert_id", "event_key"]).doNothing())
           .returning("event_id")
           .executeTakeFirst();
+        const state = result.state ? { state: JSON.stringify(result.state) } : {};
         if (event) {
           await trx
             .updateTable("alerts")
-            .set({ last_fired_at: now })
+            .set({ last_fired_at: now, ...state })
             .where("alert_id", "=", r.alert_id)
             .execute();
+          if (flags.notifications) {
+            await trx
+              .insertInto("notifications")
+              .values({
+                user_id: r.user_id,
+                event_id: event.event_id,
+                title: result.subject.slice(0, 300),
+                body: body.slice(0, 4000),
+                href: safeHref(result.href),
+                created_at: now,
+              })
+              .execute();
+          }
+        } else if (result.state) {
+          await trx.updateTable("alerts").set(state).where("alert_id", "=", r.alert_id).execute();
         }
         return Boolean(event);
       });
@@ -170,7 +272,15 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
       throw new Error(`${delivery.failed} alert email(s) failed: ${delivery.errors.join("; ")}`);
     }
     await finishRun(ctx.db, runId, { status: "succeeded", counts, at: ctx.clock() });
-    return { runId, source, today, evaluated: rows.rows.length, ...outcome, delivery };
+    return {
+      runId,
+      source,
+      today,
+      trigger: input.trigger,
+      evaluated: rows.rows.length,
+      ...outcome,
+      delivery,
+    };
   } catch (err) {
     await finishRun(ctx.db, runId, {
       status: "failed",
@@ -180,6 +290,212 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
     });
     throw err;
   }
+}
+
+/** Where the event's figures come from, with their date (spec: every number has a source). */
+function sourceLine(
+  def: AlertDefinition,
+  result: Extract<Evaluation, { fire: true }>,
+  attribution: string,
+): string {
+  switch (def.kind) {
+    case "earnings_upcoming":
+      return "Earnings dates: Finnhub (personal use).";
+    case "new_filing":
+      return "Filings: SEC EDGAR (public domain).";
+    case "screen_membership":
+      return `Screener snapshot as of ${result.date}, built from end-of-day data. ${attribution}.`;
+    default:
+      return `End-of-day data as of ${result.date}. ${attribution}.`;
+  }
+}
+
+/**
+ * Queues an evaluation as soon as new data is stored (step E2), when some active alert would
+ * look at it. The job id names the ingestion run, so dispatching twice is a no-op.
+ */
+export async function queueAlertEvaluation(
+  ctx: WorkerContext,
+  opts: {
+    trigger: Exclude<Trigger, "schedule" | "manual">;
+    runId: string;
+    securityIds?: string[];
+    kinds: readonly AlertKind[];
+  },
+): Promise<boolean> {
+  const { securityIds, kinds } = opts;
+  if (securityIds?.length === 0) return false;
+  const found = await sql<{ found: boolean }>`
+    select exists (
+      select 1 from public.alerts a
+      where a.active and a.kind = any(${kinds}::text[])
+        ${securityIds ? sql`and a.security_id = any(${securityIds}::bigint[])` : sql``}
+    ) as found
+  `.execute(ctx.db);
+  if (!found.rows[0]?.found) return false;
+  await ctx.dispatch.dispatch({
+    name: JOBS.evaluateAlerts,
+    data: { trigger: opts.trigger, kinds: [...kinds], ...(securityIds ? { securityIds } : {}) },
+    jobId: jobId(JOBS.evaluateAlerts, opts.trigger, opts.runId),
+  });
+  return true;
+}
+
+/** The latest bar on or before `through` and the one before it, in the latest bar's split basis. */
+async function latestBars(
+  ctx: WorkerContext,
+  source: ProviderId,
+  ids: string[],
+  through: string,
+): Promise<Map<string, LatestBar>> {
+  if (ids.length === 0) return new Map();
+  const rows = await sql<{
+    security_id: string;
+    date: string | null;
+    close: number | null;
+    prev_date: string | null;
+    prev_close: number | null;
+  }>`
+    select s.security_id::text, t.date, t.close::float8 as close, y.date as prev_date,
+      y.close::float8 * coalesce(fy.split_factor, 1) / coalesce(ft.split_factor, 1) as prev_close
+    from unnest(${ids}::bigint[]) as s(security_id)
+    left join lateral (
+      select p.date, p.close from market.prices_daily p
+      where p.security_id = s.security_id and p.source = ${source} and p.date <= ${through}::date
+      order by p.date desc limit 1
+    ) t on true
+    left join lateral (
+      select p.date, p.close from market.prices_daily p
+      where p.security_id = s.security_id and p.source = ${source} and p.date < t.date
+      order by p.date desc limit 1
+    ) y on true
+    left join lateral (
+      select af.split_factor from market.adjustment_factors af
+      where af.security_id = s.security_id and af.ex_date > t.date
+      order by af.ex_date limit 1
+    ) ft on true
+    left join lateral (
+      select af.split_factor from market.adjustment_factors af
+      where af.security_id = s.security_id and af.ex_date > y.date
+      order by af.ex_date limit 1
+    ) fy on true
+  `.execute(ctx.db);
+  const out = new Map<string, LatestBar>();
+  for (const r of rows.rows) {
+    if (r.date && r.close !== null) {
+      out.set(r.security_id, {
+        date: r.date,
+        close: r.close,
+        prevDate: r.prev_date,
+        prevClose: r.prev_close,
+      });
+    }
+  }
+  return out;
+}
+
+async function upcomingEarnings(
+  ctx: WorkerContext,
+  ids: string[],
+  today: string,
+): Promise<Map<string, UpcomingEarnings>> {
+  if (ids.length === 0) return new Map();
+  const rows = await sql<{ security_id: string; report_date: string; hour: string | null }>`
+    select distinct on (security_id) security_id::text, report_date, hour
+    from market.earnings_events
+    where security_id = any(${ids}::bigint[]) and report_date > ${today}::date
+    order by security_id, report_date
+  `.execute(ctx.db);
+  return new Map(rows.rows.map((r) => [r.security_id, { date: r.report_date, hour: r.hour }]));
+}
+
+/** Adjusted closes and split-adjusted volumes up to `through`, oldest first. */
+async function adjustedSeries(
+  ctx: WorkerContext,
+  source: ProviderId,
+  ids: string[],
+  through: string,
+  today: string,
+): Promise<Map<string, DailySeries>> {
+  if (ids.length === 0) return new Map();
+  const end = through < today ? through : today;
+  const from = new Date(Date.parse(`${end}T00:00:00Z`) - SERIES_DAYS * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const rows = await sql<{ security_id: string; date: string; close: number; volume: number }>`
+    select security_id::text, date, close, volume
+    from market.prices_daily_adjusted
+    where source = ${source} and security_id = any(${ids}::bigint[])
+      and date > ${from}::date and date <= ${through}::date
+    order by security_id, date
+  `.execute(ctx.db);
+  const out = new Map<string, DailySeries>();
+  for (const r of rows.rows) {
+    let s = out.get(r.security_id);
+    if (!s) out.set(r.security_id, (s = { dates: [], close: [], volume: [] }));
+    s.dates.push(r.date);
+    s.close.push(r.close);
+    s.volume.push(r.volume);
+  }
+  return out;
+}
+
+/** Filings accepted after the alert was created and stored after it last looked. */
+async function storedFilings(
+  ctx: WorkerContext,
+  cik: string,
+  createdAt: Date,
+  seenThrough: string | undefined,
+): Promise<FilingItem[]> {
+  const rows = await sql<{
+    accession_no: string;
+    form_type: string;
+    filed_at: Date;
+    filing_date: string;
+    url: string;
+    ingested_at: Date;
+  }>`
+    select accession_no, form_type, filed_at, filing_date, url, ingested_at
+    from market.filings
+    where cik = ${cik} and filed_at > ${createdAt}
+      and ingested_at > ${seenThrough ?? "-infinity"}::timestamptz
+    order by ingested_at, accession_no
+    limit 500
+  `.execute(ctx.db);
+  return rows.rows.map((f) => ({
+    accessionNo: f.accession_no,
+    form: f.form_type,
+    filedAt: f.filed_at,
+    filingDate: f.filing_date,
+    url: f.url,
+    storedAt: f.ingested_at,
+  }));
+}
+
+/** A saved screen's results on the current snapshot, computed once per screen per run. */
+async function screenResults(
+  ctx: WorkerContext,
+  r: AlertRow,
+  cache: Map<string, ScreenResults | null>,
+): Promise<ScreenResults | null> {
+  if (!r.screen_id) return null;
+  if (cache.has(r.screen_id)) return cache.get(r.screen_id)!;
+  const parsed = Screen.safeParse(r.screen_definition);
+  let results: ScreenResults | null = null;
+  if (parsed.success) {
+    const { members, asOf } = await screenMembers(ctx.db, parsed.data);
+    if (asOf) {
+      results = {
+        screenId: r.screen_id,
+        name: r.screen_name ?? "",
+        definition: screenFingerprint(parsed.data),
+        asOf,
+        members,
+      };
+    }
+  }
+  cache.set(r.screen_id, results);
+  return results;
 }
 
 async function deliverPending(ctx: WorkerContext, now: Date, today: string) {

@@ -443,11 +443,10 @@ async function main(): Promise<void> {
 
       case "alerts":
         print(
-          await runJob(
-            ctx,
-            JOBS.evaluateAlerts,
-            flag("through") ? { through: flag("through") } : {},
-          ),
+          await runJob(ctx, JOBS.evaluateAlerts, {
+            trigger: "manual",
+            ...(flag("through") ? { through: flag("through") } : {}),
+          }),
         );
         break;
 

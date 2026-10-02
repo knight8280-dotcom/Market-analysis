@@ -21,6 +21,18 @@ export const FEATURE_FLAGS = {
       "DCF calculator, saved scenarios, peer multiples and their history on ticker pages.",
     default: true,
   },
+  alert_types: {
+    label: "More alert types",
+    description:
+      "RSI and moving-average crossings, volume spikes, new SEC filings and changes in a saved screen's results.",
+    default: false,
+  },
+  notifications: {
+    label: "Notifications",
+    description:
+      "In-app notifications when alerts fire, with snooze and delete; the bell in the header.",
+    default: false,
+  },
 } as const satisfies Record<string, FlagDefinition>;
 
 export type FlagKey = keyof typeof FEATURE_FLAGS;

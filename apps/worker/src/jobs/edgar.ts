@@ -13,6 +13,7 @@ import { statusDelta, statusSnapshot } from "../http-stats";
 import { FRESHNESS_SLOS } from "../freshness";
 import { JOBS, jobId } from "../queues";
 import { insertFacts, insertFilings } from "../repo/edgar";
+import { queueAlertEvaluation } from "./alerts";
 import { recordIssues, type IssueRow } from "../repo/quality";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
 import { applyEdgarEntity, securitiesMissingCik, setCik } from "../repo/securities";
@@ -147,6 +148,20 @@ export async function ingestFilings(ctx: WorkerContext, raw: unknown) {
     const inserted = await insertFilings(ctx.db, filings);
     counts.rows_inserted = inserted.length;
     counts.rows_unchanged = filings.length - inserted.length;
+    if (inserted.length > 0) {
+      // New-filing alerts on this registrant are checked now (Phase 2 step E2).
+      const securities = await ctx.db
+        .selectFrom("market.securities")
+        .select("security_id")
+        .where("cik", "=", padCik(cik))
+        .execute();
+      await queueAlertEvaluation(ctx, {
+        trigger: "filings",
+        runId,
+        securityIds: securities.map((s) => s.security_id),
+        kinds: ["new_filing"],
+      });
+    }
     // New periodic reports carry new XBRL facts: refresh companyfacts (fundamentals SLO: 24h).
     const periodic = inserted
       .filter((f) => (FRESHNESS_SLOS.fundamentals.forms as readonly string[]).includes(f.form_type))

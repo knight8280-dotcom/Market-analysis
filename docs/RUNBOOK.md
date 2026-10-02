@@ -144,7 +144,8 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 
 ## Alerts
 
-- The worker evaluates alerts at 18:50 ET; to run now: `pnpm worker alerts` (prints what fired and what was emailed). Re-running is safe: nothing fires twice for the same bar.
+- Alerts are checked within seconds of new data: after each end-of-day load (price, RSI, moving-average and volume alerts on those stocks), after a filings refresh stores new filings, and after the screener is rebuilt. At 18:50 ET the worker checks every alert again (and earnings dates). To run now: `pnpm worker alerts` (prints what fired and what was emailed). Re-running is safe: nothing fires twice for the same bar, filing or change of results.
+- Links in alert emails ("Manage this alert") point to `APP_BASE_URL` (default `http://localhost:3000`). Set it to the address you open the app at, for example your Tailscale HTTPS address once phone access is set up.
 - **Email setup** (optional; without it events are listed on `/alerts` as "Not emailed"): create a free Resend account with your own address, create an API key, and set `RESEND_API_KEY` and `ALERT_EMAIL_TO` (that same address) in `.env`. The default sender, `onboarding@resend.dev`, delivers only to the account's own address, which is all personal use needs. `ALERT_DAILY_CAP` (default 20) limits emails per day; the rest are recorded as suppressed.
 - **A failed email** (status "Failed" with Resend's error) is retried by the job's own retries; if it keeps failing, check the key and address, then run `pnpm worker alerts` again. Failed events older than a day are not retried.
 - To check delivery end to end without Resend, point `RESEND_API_URL` at a local capture server (the E2E test does this).

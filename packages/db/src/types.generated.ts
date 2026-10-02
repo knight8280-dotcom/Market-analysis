@@ -29,11 +29,15 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AlertEvents {
   alert_id: Int8;
+  /**
+   * Date of the data behind the event: the session, earnings report, filing or screener snapshot.
+   */
   bar_date: string;
   delivered_at: Timestamp | null;
   delivery_status: Generated<string>;
   error: string | null;
   event_id: Generated<Int8>;
+  event_key: string;
   fired_at: Generated<Timestamp>;
   message: string;
   user_id: string;
@@ -47,7 +51,10 @@ export interface Alerts {
   kind: string;
   last_fired_at: Timestamp | null;
   params: Generated<Json>;
-  security_id: Int8;
+  screen_id: Int8 | null;
+  security_id: Int8 | null;
+  snoozed_until: Timestamp | null;
+  state: Generated<Json>;
   updated_at: Generated<Timestamp>;
   user_id: string;
 }
@@ -332,6 +339,17 @@ export interface MarketSecuritySymbolHistory {
   valid_to: string | null;
 }
 
+export interface Notifications {
+  body: Generated<string>;
+  created_at: Generated<Timestamp>;
+  event_id: Int8;
+  href: string | null;
+  notification_id: Generated<Int8>;
+  read_at: Timestamp | null;
+  title: string;
+  user_id: string;
+}
+
 export interface OpsAlerts {
   alert_id: Generated<Int8>;
   dataset: string;
@@ -516,6 +534,7 @@ export interface DB {
   "market.screener_snapshot": MarketScreenerSnapshot;
   "market.securities": MarketSecurities;
   "market.security_symbol_history": MarketSecuritySymbolHistory;
+  notifications: Notifications;
   "ops.alerts": OpsAlerts;
   "ops.data_corrections": OpsDataCorrections;
   "ops.data_ingestion_runs": OpsDataIngestionRuns;

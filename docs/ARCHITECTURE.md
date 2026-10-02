@@ -9,7 +9,7 @@ Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is
  vendors         │  scheduler tick (30s, market calendar) ──► BullMQ queues ──► job handlers ──► Postgres     │
  (Tiingo,  ◄─────┤  HttpClient (allowlist, backoff) ◄─ adapters ◄─ provider routing/failover                  │
   EDGAR, FRED,   │  Redis: queues, rate limiters (shared by all processes), market-events pub/sub            │
-  Finnhub)       │  evaluate-alerts ──► Resend HTTP API ──► the owner's own inbox                             │
+  Finnhub)       │  evaluate-alerts ──► notifications table; Resend HTTP API ──► the owner's own inbox        │
                  └────────────────────────────────────────────────────────────────────────────────────────────┘
                  ┌──────────────── apps/web (Next.js 16) ─────────────────┐
  owner ─────────►│ proxy.ts (owner session) ─► pages + /api ─► market.*, ops.* │  (no provider calls from the browser, ever)
@@ -31,7 +31,7 @@ Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is
 | `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                                                                                                                                                                                   |
 | `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups                                                                                                                                                                    |
 | `packages/screener`    | screen JSON schema, SQL compiler that emits only whitelisted identifiers and binds every value, independent oracle, presets, snapshot math (ADR-021)                                                                                                                                                                                                      |
-| `packages/alerts`      | alert condition schema, pure evaluator (crossings, % moves, upcoming earnings, cooldown) and wording shared by worker emails and the web page (ADR-022)                                                                                                                                                                                                   |
+| `packages/alerts`      | alert condition schema, pure evaluator (price, RSI and moving-average crossings, % moves, volume spikes, earnings dates, new filings, screen changes; cooldown and snooze) and wording shared by worker emails and the web pages (ADR-022, ADR-028)                                                                                                       |
 | `packages/portfolio`   | ledger replay (FIFO lots, splits, implicit deposits), TWR, XIRR, drawdown, benchmark index, risk measures on session returns, CSV parsing and validation (ADR-023, ADR-026)                                                                                                                                                                               |
 | `packages/metrics`     | one definition of each series statistic: returns, volatility, Sharpe, Sortino, drawdown, CAGR, beta, correlation, correlation matrix, concentration (ADR-026)                                                                                                                                                                                             |
 | `packages/valuation`   | two-stage DCF, sensitivity grid, multiples, peer median and percentile, figures as known on a date (ADR-027)                                                                                                                                                                                                                                              |
@@ -52,7 +52,7 @@ Migrations live in `supabase/migrations` (forward-only). Each has a rollback in 
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `market` | `data_providers`, `securities`, `security_symbol_history`, `provider_symbols`, `prices_daily` (+ partitions), `corporate_actions`, `adjustment_factors`, `prices_daily_adjusted` (view), `fundamentals_facts`, `filings`, `financial_statements`, `screener_snapshot`, `earnings_events`, `economic_releases`, `macro_series`, `macro_observations` | server/worker only                                      |
 | `ops`    | `data_ingestion_runs`, `data_corrections`, `data_quality_issues`, `provider_health`, `dataset_routing`, `alerts`, `feature_flags` (owner overrides, ADR-024)                                                                                                                                                                                        | server/worker only                                      |
-| `public` | `watchlists`, `watchlist_items`, `saved_screens`, `portfolios`, `transactions`, `alerts`, `alert_events`, `strategies`, `backtest_runs`, `backtest_results`, `valuation_scenarios`, `audit_logs`: per-user rows (`user_id`) with RLS policies (own rows only; audit log and backtest results read-only to clients)                                  | owner only (server); RLS for a future multi-user deploy |
+| `public` | `watchlists`, `watchlist_items`, `saved_screens`, `portfolios`, `transactions`, `alerts`, `alert_events`, `strategies`, `backtest_runs`, `backtest_results`, `valuation_scenarios`, `notifications`, `audit_logs`: per-user rows (`user_id`) with RLS policies (own rows only; audit log and backtest results read-only to clients)                 | owner only (server); RLS for a future multi-user deploy |
 
 `market` and `ops` are not in Supabase's API-exposed schema list, and client roles (`anon`, `authenticated`) have no `USAGE` on them. Every table, including every partition, has RLS enabled. `auditDatabaseSecurity()` checks all of this in CI and fails on any table without RLS, any client grant on a private schema, and any function a client role could execute.
 
@@ -110,16 +110,17 @@ Raw prints are never overwritten.
 
 ### Jobs and schedules
 
-| Queue                 | Jobs                                                                                |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`        |
-| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                           |
-| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`                    |
-| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                                |
-| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`, `evaluate-alerts` |
-| `monitor`             | `staleness-monitor`                                                                 |
-| `backtest-run`        | `run-backtest` (one at a time, each in a worker thread; ADR-025)                    |
-| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                                 |
+| Queue                 | Jobs                                                                            |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`    |
+| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                       |
+| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`                |
+| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                            |
+| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`                |
+| `alerts-evaluate`     | `evaluate-alerts` (one at a time; queued as data arrives and at 18:50; ADR-028) |
+| `monitor`             | `staleness-monitor`                                                             |
+| `backtest-run`        | `run-backtest` (one at a time, each in a worker thread; ADR-025)                |
+| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                             |
 
 `dueJobs(now)` is a pure function of the market calendar:
 
@@ -132,10 +133,12 @@ Raw prints are never overwritten.
 | 06:30                                                                   | earnings (Finnhub key) and economic releases (FRED) |
 | 18:00                                                                   | macro                                               |
 | 18:45                                                                   | screener snapshot (after the 18:30 EOD deadline)    |
-| 18:50                                                                   | alert evaluation and email                          |
+| 18:50                                                                   | every alert evaluated again, with email             |
 | 21:00                                                                   | EDGAR sweep (off-peak)                              |
 
 Besides the calendar, a 3-second poll enqueues backtests the owner queued (`run-backtest/<run id>`) and fails runs left running long after their time limit.
+
+Alerts do not wait for 18:50: an end-of-day load that stores new bars queues `evaluate-alerts/bars/<run id>` for the price, RSI, moving-average and volume alerts on those securities; a filings refresh that stores new filings queues `evaluate-alerts/filings/<run id>` for new-filing alerts on that registrant; a screener rebuild queues `evaluate-alerts/screener/<run id>` for screen alerts. Each is queued only when such an alert is active.
 
 Job ids are deterministic (`ingest-eod/2026-09-29/TEST_S001`), so re-dispatching is a no-op. Jobs retry 5 times with exponential backoff and jitter. Non-retryable provider errors (404, bad shape, license) become `UnrecoverableError`, and exhausted jobs go to the dead-letter queue.
 

@@ -63,16 +63,16 @@ Every new feature ships behind a feature flag (a small table and a settings page
 
 **Migrations** (each with a rollback and round-trip test):
 
-| #   | Adds                                                                                                                                                         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 12  | `ops.feature_flags`                                                                                                                                          |
-| 13  | `public.strategies`, `public.backtest_runs` (code version, data snapshot id, assumptions, status), `public.backtest_results` (metrics, equity curve, trades) |
-| 14  | `public.valuation_scenarios`                                                                                                                                 |
-| 15  | alert kinds (indicator, volume spike, new filing, insider purchase, screen membership); `public.notifications` (in-app); `public.push_subscriptions`         |
-| 16  | `public.chart_drawings`, `public.dashboard_layouts`                                                                                                          |
-| 17  | `market.insider_transactions`, `market.institutional_holdings`, `market.short_interest` (2b)                                                                 |
-| 18  | `market.news_articles`, `market.news_tickers`, sentiment with model version (2b)                                                                             |
-| 19  | `ops.ai_requests` and `ops.ai_tool_calls` (prompt and tool logs, PII redacted) (2b)                                                                          |
+| #   | Adds                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 12  | `ops.feature_flags`                                                                                                                                                                                                                          |
+| 13  | `public.strategies`, `public.backtest_runs` (code version, data snapshot id, assumptions, status), `public.backtest_results` (metrics, equity curve, trades)                                                                                 |
+| 14  | `public.valuation_scenarios`                                                                                                                                                                                                                 |
+| 15  | alert kinds (indicator, volume spike, new filing, insider purchase, screen membership), alert state and snooze, event keys; `public.notifications` (in-app). `public.push_subscriptions` moves to J2's migration, with the code that uses it |
+| 16  | `public.chart_drawings`, `public.dashboard_layouts`                                                                                                                                                                                          |
+| 17  | `market.insider_transactions`, `market.institutional_holdings`, `market.short_interest` (2b)                                                                                                                                                 |
+| 18  | `market.news_articles`, `market.news_tickers`, sentiment with model version (2b)                                                                                                                                                             |
+| 19  | `ops.ai_requests` and `ops.ai_tool_calls` (prompt and tool logs, PII redacted) (2b)                                                                                                                                                          |
 
 **Worker additions:** backtest runner queue (CPU-bound, one at a time, time limit); event-driven alert evaluation on `bars_updated`; Form 4 and 13F ingestion; FINRA short interest; news ingestion and sentiment; push delivery.
 
@@ -152,7 +152,7 @@ Approved 2026-10-02 with the defaults, except push notifications on mobile and d
 | B Backtesting              | done 2026-10-02: engine, metrics and validation (46 unit tests), migration 13, worker runs in a thread (15 integration tests), builder and reports (3 E2E) (ADR-025)                                                                             |
 | C Portfolio risk           | done 2026-10-02: shared `@market/metrics` (ADR-026), risk measures checked against the extended spreadsheet fixture within 0.01%, risk panel with methods in tooltips, allocation by asset class                                                 |
 | D Valuation                | done 2026-10-02: `@market/valuation` checked against a hand-built spreadsheet fixture (ADR-027), migration 14, Valuation tab with sourced inputs, sensitivity grid, saved scenarios, peers and five-year history (3 E2E; recompute under 100 ms) |
-| E Alerts and notifications | not started                                                                                                                                                                                                                                      |
+| E Alerts and notifications | in progress: E1 conditions (37 unit tests) and E2 evaluation as data arrives, on its own queue (migration 15; about 0.1 s from the end-of-day job to the email through real queues; ADR-028); E3 in-app notifications next                       |
 | F Drawings and dashboard   | not started                                                                                                                                                                                                                                      |
 | G 2a acceptance            | not started                                                                                                                                                                                                                                      |
 | H–L (2b)                   | not started                                                                                                                                                                                                                                      |

@@ -64,7 +64,7 @@ export interface EvaluationInput {
   snoozedUntil?: Date | null;
   /** RSI, moving-average and volume conditions. */
   series?: DailySeries | null;
-  /** New-filing conditions. */
+  /** New-filing conditions; null when the company has no SEC registrant id (CIK). */
   filings?: readonly FilingItem[] | null;
   /** Screen conditions. */
   screen?: ScreenResults | null;
@@ -299,10 +299,12 @@ function check(def: AlertDefinition, input: EvaluationInput): Hit | Quiet {
     }
 
     case "new_filing": {
+      // Null: the company has no SEC registrant id, so its filings cannot be followed.
+      if (!input.filings) return NO_DATA;
       const seen = input.state?.filingsSeenThrough
         ? Date.parse(input.state.filingsSeenThrough)
         : -Infinity;
-      const fresh = (input.filings ?? []).filter((f) => f.storedAt.getTime() > seen);
+      const fresh = input.filings.filter((f) => f.storedAt.getTime() > seen);
       if (fresh.length === 0) return NOT_MET;
       const state: AlertState = {
         ...input.state,

@@ -11,6 +11,7 @@ import type { Insertable } from "kysely";
 import type { WorkerContext } from "../context";
 import { JOBS } from "../queues";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
+import { queueAlertEvaluation } from "./alerts";
 import { routeFor } from "../routing";
 
 const DAY = 86_400_000;
@@ -146,6 +147,8 @@ export async function refreshScreener(ctx: WorkerContext) {
     });
     counts.rows_inserted = values.length;
     await finishRun(ctx.db, runId, { status: "succeeded", counts, at: ctx.clock() });
+    // Alerts on saved screens compare the new results now (Phase 2 step E2).
+    await queueAlertEvaluation(ctx, { trigger: "screener", runId, kinds: ["screen_membership"] });
     return { runId, source, asOf, securities: values.length };
   } catch (err) {
     await finishRun(ctx.db, runId, {

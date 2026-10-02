@@ -249,6 +249,17 @@ describe("new filings", () => {
     });
   });
 
+  it("has no data for a company without an SEC registrant id", () => {
+    expect(evaluateAlert(watch(["8-K"]), input({ filings: null }))).toEqual({
+      fire: false,
+      reason: "no_data",
+    });
+    expect(evaluateAlert(watch(["8-K"]), input({ filings: [] }))).toEqual({
+      fire: false,
+      reason: "not_met",
+    });
+  });
+
   it("keeps filings for later while snoozed or cooling down", () => {
     const filings = [filing(1, "8-K")];
     const snoozed = evaluateAlert(

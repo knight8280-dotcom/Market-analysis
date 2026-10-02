@@ -67,6 +67,8 @@ export interface AlertDelivery {
   from: string;
   /** Emails per exchange-calendar day across all alerts. */
   dailyCap: number;
+  /** Base of the links in alert emails (APP_BASE_URL); http://localhost:3000 when not set. */
+  appUrl?: string;
 }
 
 export type DatasetKey = Dataset;

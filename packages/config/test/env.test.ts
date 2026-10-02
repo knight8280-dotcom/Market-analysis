@@ -28,6 +28,17 @@ describe("loadWorkerEnv", () => {
     expect(env.FRED_ENABLED).toBe(false);
   });
 
+  it("takes the app's address for email links without a trailing slash", () => {
+    expect(loadWorkerEnv(worker).APP_BASE_URL).toBe("http://localhost:3000");
+    expect(
+      loadWorkerEnv({ ...worker, APP_BASE_URL: "https://desk.example-tailnet.ts.net/" })
+        .APP_BASE_URL,
+    ).toBe("https://desk.example-tailnet.ts.net");
+    expect(
+      problemsOf(() => loadWorkerEnv({ ...worker, APP_BASE_URL: "javascript:alert(1)" })),
+    ).toHaveLength(1);
+  });
+
   it("reports every missing required variable by name", () => {
     const problems = problemsOf(() => loadWorkerEnv({}));
     expect(problems).toEqual(

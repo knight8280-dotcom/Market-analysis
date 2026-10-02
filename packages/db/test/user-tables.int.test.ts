@@ -4,9 +4,9 @@ import { createTestDatabase, withRole, type TestDatabase } from "../src/testing"
 import { TEMPLATE } from "./global-setup";
 
 /**
- * Row-level security on the per-user tables (migrations 10, 13 and 14): a signed-in user sees and
- * changes only their own rows; anonymous clients see nothing; the audit log and backtest results
- * are read-only to clients.
+ * Row-level security on the per-user tables (migrations 10, 13, 14 and 15): a signed-in user sees
+ * and changes only their own rows; anonymous clients see nothing; the audit log and backtest
+ * results are read-only to clients.
  */
 const ALICE = "00000000-0000-0000-0000-00000000000a";
 const BOB = "00000000-0000-0000-0000-00000000000b";
@@ -60,6 +60,21 @@ beforeAll(async () => {
        values ($1, $2, '{}', '{}', '{}')`,
       [run.rows[0]!.run_id, user],
     );
+    const alert = await t.pool.query<{ alert_id: string }>(
+      `insert into public.alerts (user_id, security_id, kind, params)
+       values ($1, $2, 'price_above', '{"price": 1}') returning alert_id`,
+      [user, securityId],
+    );
+    const event = await t.pool.query<{ event_id: string }>(
+      `insert into public.alert_events (alert_id, user_id, bar_date, event_key, message)
+       values ($1, $2, '2026-09-30', '2026-09-30', 'Fired') returning event_id`,
+      [alert.rows[0]!.alert_id, user],
+    );
+    await t.pool.query(
+      `insert into public.notifications (user_id, event_id, title, href)
+       values ($1, $2, 'Fired', '/stocks/TEST_RLS')`,
+      [user, event.rows[0]!.event_id],
+    );
   }
 });
 afterAll(async () => {
@@ -83,6 +98,9 @@ describe("per-user tables", () => {
         "backtest_runs",
         "backtest_results",
         "valuation_scenarios",
+        "alerts",
+        "alert_events",
+        "notifications",
       ]) {
         expect(await count(c, table), table).toBe(1);
       }
@@ -172,6 +190,57 @@ describe("per-user tables", () => {
     await expect(insert("done")).rejects.toThrow(/check constraint/);
     await expect(insert("queued", "not-a-hash")).rejects.toThrow(/check constraint/);
     await expect(insert("queued", "a".repeat(64))).resolves.toBeDefined();
+  });
+
+  it("let a user mark their own notifications read, never another user's", async () => {
+    await asUser(ALICE, async (c) => {
+      const mine = await c.query(`update public.notifications set read_at = now()`);
+      expect(mine.rowCount).toBe(1);
+      const theirs = await c.query(`delete from public.notifications where user_id = $1`, [BOB]);
+      expect(theirs.rowCount).toBe(0);
+    });
+  });
+
+  it("keep alert targets and notification links well-formed (migration 15)", async () => {
+    const screen = await t.pool.query<{ screen_id: string }>(
+      `select screen_id from public.saved_screens where user_id = $1 limit 1`,
+      [ALICE],
+    );
+    const insert = (security: string | null, screenId: string | null, kind: string) =>
+      t.pool.query(
+        `insert into public.alerts (user_id, security_id, screen_id, kind, params)
+         values ($1, $2, $3, $4, '{}')`,
+        [ALICE, security, screenId, kind],
+      );
+    await expect(
+      insert(null, screen.rows[0]!.screen_id, "screen_membership"),
+    ).resolves.toBeDefined();
+    await expect(insert(securityId, null, "screen_membership")).rejects.toThrow(/check constraint/);
+    await expect(insert(null, null, "price_above")).rejects.toThrow(/check constraint/);
+    await expect(insert(securityId, screen.rows[0]!.screen_id, "rsi_below")).rejects.toThrow(
+      /check constraint/,
+    );
+    await expect(insert(securityId, null, "telepathy")).rejects.toThrow(/check constraint/);
+
+    const event = await t.pool.query<{ event_id: string }>(
+      `select event_id from public.alert_events where user_id = $1`,
+      [BOB],
+    );
+    const link = (href: string) =>
+      t.pool.query(`update public.notifications set href = $2 where event_id = $1`, [
+        event.rows[0]!.event_id,
+        href,
+      ]);
+    await expect(link("https://www.sec.gov/Archives/edgar/data/42/x.htm")).resolves.toBeDefined();
+    await expect(link("/screener?saved=1")).resolves.toBeDefined();
+    for (const bad of [
+      "https://evil.example/",
+      "//evil.example/",
+      "/\\evil.example",
+      "javascript:alert(1)",
+    ]) {
+      await expect(link(bad), bad).rejects.toThrow(/check constraint/);
+    }
   });
 
   it("give anonymous clients nothing", async () => {

@@ -37,6 +37,14 @@ export const SERIES_KINDS = [
   "volume_spike",
 ] as const satisfies readonly AlertKind[];
 
+/** Kinds that new end-of-day bars can trigger (evaluated as soon as the bars are stored). */
+export const BAR_KINDS = [
+  "price_above",
+  "price_below",
+  "pct_move",
+  ...SERIES_KINDS,
+] as const satisfies readonly AlertKind[];
+
 /** Screen alerts watch a saved screen; every other kind watches one security. */
 export const watchesScreen = (kind: AlertKind): boolean => kind === "screen_membership";
 

@@ -73,6 +73,11 @@ export const workerEnvSchema = z
     ALERT_DAILY_CAP: z.coerce.number().int().min(0).max(1000).default(20),
     /** Resend's API; tests point this at a local capture server. */
     RESEND_API_URL: z.url().default("https://api.resend.com"),
+    /** Where links in alert emails point: the address the owner opens the app at. */
+    APP_BASE_URL: z
+      .url({ protocol: /^https?$/ })
+      .default("http://localhost:3000")
+      .transform((u) => u.replace(/\/+$/, "")),
   })
   .superRefine((env, ctx) => {
     const providers = [env.DATA_PROVIDER_PRIMARY, env.DATA_PROVIDER_FALLBACK];

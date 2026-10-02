@@ -141,7 +141,7 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 ## Feature switches
 
 - `/settings` lists the features that ship behind a switch (ADR-024). "Turn off" hides a feature's pages and menu entry and keeps its data; "Use default" removes your override. Overrides are rows in `ops.feature_flags`.
-- Switches after Phase 2a, all on by default: Backtests, Portfolio risk (the risk panel and allocation by asset class; returns and holdings stay), Valuation, More alert types, Notifications, Chart drawings and Customizable dashboard (off shows the standard layout).
+- Switches after Phase 2a, all on by default: Backtests, Portfolio risk (the risk panel and allocation by asset class; returns and holdings stay), Valuation, More alert types, Notifications, Chart drawings and Customizable dashboard (off shows the standard layout). Phase 2b adds Ownership (the Ownership tab and insider-purchase alerts).
 
 ## Alerts
 
@@ -152,6 +152,7 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - To check delivery end to end without Resend, point `RESEND_API_URL` at a local capture server (the E2E test does this).
 - **Notifications:** every alert that fires also appears under the bell in the header (`/notifications`); opening the page marks them read. Each one can snooze its alert (1 day, 3 days or a week), pause it, delete it (with its notifications), or be dismissed on its own. Each alert has a page (`/alerts/<id>`, also linked from emails) with its state and what it fired. A snoozed filing or screen alert reports what it held back once the snooze ends; price and indicator crossings during a snooze are not replayed.
 - **More alert types** (RSI, moving averages, volume, filings, screens) and **Notifications** can be switched off on `/settings`; while "More alert types" is off, those alerts are not checked.
+- **Insider purchases** ("Insider buys on the open market", also from "Alert on insider purchases" on a ticker's Ownership tab): fires when a Form 4 reports an open-market purchase worth at least the amount you set at the filed prices (0 for any). It is checked as soon as the evening EDGAR refresh reads the Form 4, so it needs EDGAR (see Insider transactions below). It reports only filings accepted after the alert was created, and needs a security with a CIK (ETFs and funds have none). Turning off "Ownership" or "More alert types" stops it.
 
 ## Portfolio
 
@@ -210,6 +211,13 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **First run:** `pnpm worker short-interest` reads about a year of settlement dates for your listings and prints what it stored and any ticker whose FINRA name does not agree with yours. Then the worker checks daily at 19:30 ET (FINRA publishes about a week after each mid-month and month-end settlement date).
 - **First live run checks the adapter:** the token exchange and query format follow FINRA's documentation and have not yet been tried with a real credential. If the run fails with a response-shape or HTTP 400 error, keep the output (it names the field or status, never the secret) and fix the adapter (`packages/market-data/src/adapters/finra.ts`). Do not commit FINRA responses.
 - Days to cover is FINRA's own figure (short interest ÷ average daily volume). It is left empty when average volume is zero, where FINRA prints 999.99.
+
+## Ownership tab
+
+- A ticker's **Ownership** tab shows the three datasets above: Form 4 transactions from the last 12 months with 90-day purchase and sale totals and purchase clusters, 13F positions by quarter end (pick a quarter above the table) with changes from the quarter before, and short interest by settlement date. Every section names its source and date; each Form 4 line and 13F position links to its filing on SEC EDGAR.
+- **An empty section** says why: no CIK (ETFs and funds), no Form 4 read yet (`pnpm worker insiders`), no CUSIP for the listing or no data set read yet (`pnpm worker 13f`; see Institutional holdings above), or no FINRA credential (see Short interest above).
+- Changes in 13F positions appear only when the quarter just before is loaded; a fresh install with one data set shows positions without changes until the next set is read.
+- "Ownership" can be switched off on `/settings`; the data stays stored and is still read.
 
 ## Financial statements
 

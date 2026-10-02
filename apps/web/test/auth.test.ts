@@ -12,12 +12,14 @@ import { LoginThrottle } from "../src/server/auth/throttle";
 const FAST = { log2N: 10, r: 8, p: 1 };
 
 describe("owner password hash", () => {
+  // Two hashes at the production cost (2^17, 128 MiB each) are slow by design; a parallel run of
+  // every package's tests can push them past the default five seconds.
   it("uses OWASP scrypt parameters by default and matches the env pattern", async () => {
     const hash = await hashPassword("correct horse battery staple");
     expect(hash).toMatch(/^scrypt:17:8:1:/);
     expect(hash).toMatch(PASSWORD_HASH_PATTERN);
     expect(await verifyPassword("correct horse battery staple", hash)).toBe(true);
-  });
+  }, 30_000);
 
   it("rejects a wrong password and salts every hash", async () => {
     const a = await hashPassword("correct horse battery staple", FAST);

@@ -143,6 +143,14 @@ describe("figures as known on a date", () => {
     }
   });
 
+  it("give the figure for an earlier period, as known now", () => {
+    // The trailing twelve months a year before the latest: FY2024, as reported.
+    expect(ttmAsOf(revenue, "2026-02-11", { through: "2025-01-05" })).toMatchObject({
+      value: 1000,
+      periodEnd: "2024-12-31",
+    });
+  });
+
   it("fall back to the fiscal year for a line some quarters do not report", () => {
     const da = [fy("2025-12-31", 90, "2026-02-10"), q("2025-12-31", null, "2026-02-10")];
     expect(ttmAsOf(da, "2026-03-01")).toMatchObject({ value: 90, basis: "fiscal_year" });

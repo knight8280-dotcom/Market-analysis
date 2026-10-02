@@ -64,3 +64,14 @@ describe("backtest disclosure (spec §12)", () => {
     expect(html).toContain("This tool does not recommend any strategy.");
   });
 });
+
+describe("valuation copy (spec §5.6, §12)", () => {
+  it("uses the required wording", () => {
+    expect(COPY.valuationCalculator).toBe(
+      "This model is a calculator driven by your assumptions. It is not a price target or recommendation.",
+    );
+    expect(COPY.valuationOutput).toBe(
+      "Model output depends entirely on your inputs. It is not a price target.",
+    );
+  });
+});

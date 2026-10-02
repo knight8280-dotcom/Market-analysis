@@ -26,6 +26,7 @@
     "@market/portfolio": "workspace:*",
     "@market/screener": "workspace:*",
     "@market/ui": "workspace:*",
+    "@market/valuation": "workspace:*",
     "ioredis": "6.0.0",
     "lightweight-charts": "5.2.1",
     "lucide-react": "1.49.0",

@@ -16,6 +16,7 @@ export const PAGE_ROUTES: Record<string, string> = {
   "/settings": "/settings",
   "/stocks/[ticker]": "/stocks/TEST_DIV",
   "/stocks/[ticker]/financials": "/stocks/TEST_FIN/financials",
+  "/stocks/[ticker]/valuation": "/stocks/TEST_FIN/valuation",
   "/watchlists": "/watchlists",
 };
 

@@ -467,6 +467,16 @@ export interface Transactions {
   user_id: string;
 }
 
+export interface ValuationScenarios {
+  created_at: Generated<Timestamp>;
+  inputs: Json;
+  name: string;
+  scenario_id: Generated<Int8>;
+  security_id: Int8;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface WatchlistItems {
   added_at: Generated<Timestamp>;
   position: Generated<number>;
@@ -517,6 +527,7 @@ export interface DB {
   saved_screens: SavedScreens;
   strategies: Strategies;
   transactions: Transactions;
+  valuation_scenarios: ValuationScenarios;
   watchlist_items: WatchlistItems;
   watchlists: Watchlists;
 }

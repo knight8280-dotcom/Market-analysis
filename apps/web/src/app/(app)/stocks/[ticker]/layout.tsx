@@ -17,6 +17,7 @@ import {
   priceSource,
   sourceInfo,
 } from "../../../../server/market";
+import { flagEnabled } from "../../../../server/flags";
 import { securityForTicker, tickerOf } from "../../../../server/stock";
 
 type Params = Promise<{ ticker: string }>;
@@ -98,7 +99,7 @@ export default async function StockLayout({
           <p className="text-sm text-muted-foreground">No prices for this security yet.</p>
         )}
       </header>
-      <StockTabs ticker={security.ticker} />
+      <StockTabs ticker={security.ticker} valuation={await flagEnabled("valuation")} />
       {children}
     </div>
   );

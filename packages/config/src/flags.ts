@@ -15,6 +15,12 @@ export const FEATURE_FLAGS = {
     description: "Strategy builder, backtest runs and their reports.",
     default: true,
   },
+  valuation: {
+    label: "Valuation",
+    description:
+      "DCF calculator, saved scenarios, peer multiples and their history on ticker pages.",
+    default: true,
+  },
 } as const satisfies Record<string, FlagDefinition>;
 
 export type FlagKey = keyof typeof FEATURE_FLAGS;

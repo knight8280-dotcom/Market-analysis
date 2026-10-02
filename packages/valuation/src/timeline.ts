@@ -36,8 +36,16 @@ const knownOn = (v: FiledValue | null, asOf: string) => v !== null && v.filed < 
  * when they are consecutive and the latest ended within 200 days, else the latest fiscal year
  * that ended within 460 days. All four quarters need a value.
  */
-export function ttmAsOf(rows: readonly PeriodValue[], asOf: string): KnownValue | null {
-  const quarters = rows
+export function ttmAsOf(
+  rows: readonly PeriodValue[],
+  asOf: string,
+  opts: { through?: string } = {},
+): KnownValue | null {
+  // `through` asks for the figure covering periods up to that date (e.g. a year earlier), with
+  // freshness measured from it; what counts as known still depends on `asOf`.
+  const through = opts.through ?? asOf;
+  const eligible = rows.filter((r) => r.periodEnd <= through);
+  const quarters = eligible
     .filter((r) => r.frequency === "quarterly" && knownOn(r.value, asOf))
     .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))
     .slice(0, 4);
@@ -49,7 +57,7 @@ export function ttmAsOf(rows: readonly PeriodValue[], asOf: string): KnownValue 
         (days(quarters[i - 1]!.periodEnd, q.periodEnd) >= 80 &&
           days(quarters[i - 1]!.periodEnd, q.periodEnd) <= 100),
     );
-  if (consecutive && days(asOf, quarters[0]!.periodEnd) <= 200) {
+  if (consecutive && days(through, quarters[0]!.periodEnd) <= 200) {
     return {
       value: quarters.reduce((s, q) => s + q.value!.value, 0),
       periodEnd: quarters[0]!.periodEnd,
@@ -60,10 +68,10 @@ export function ttmAsOf(rows: readonly PeriodValue[], asOf: string): KnownValue 
       basis: "four_quarters",
     };
   }
-  const annual = rows
+  const annual = eligible
     .filter((r) => r.frequency === "annual" && knownOn(r.value, asOf))
     .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
-  if (annual && days(asOf, annual.periodEnd) <= 460) {
+  if (annual && days(through, annual.periodEnd) <= 460) {
     return {
       value: annual.value!.value,
       periodEnd: annual.periodEnd,

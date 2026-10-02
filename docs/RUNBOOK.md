@@ -167,6 +167,13 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - Ranking a sweep by Sharpe ratio needs T-bill rates (FRED `DTB3`, ingested when `FRED_ENABLED` is set); without them the builder ranks by CAGR.
 - `/settings` can turn Backtests off; runs and strategies are kept.
 
+## Valuation
+
+- A ticker's **Valuation** tab: the DCF calculator starts from the latest filings where they exist (each input says where it came from) and from labelled assumptions for the rest; edit anything and the outputs and the sensitivity grid update at once. "Save these inputs" stores a scenario per security; "Load" puts it back.
+- **Peers** share the SEC industry code (stored when filings are ingested from EDGAR submissions, e.g. `pnpm worker edgar --tickers AAPL`) and are the closest eight by market cap. Type tickers into "Peer tickers" to compare with your own list. A dash means a figure is missing or not positive; nothing is estimated.
+- The **five-year history** needs prices and filings; it uses figures as first reported, known by each month end.
+- `/settings` can turn Valuation off; saved scenarios are kept.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

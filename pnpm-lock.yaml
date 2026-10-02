@@ -77,6 +77,9 @@ importers:
       '@market/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@market/valuation':
+        specifier: workspace:*
+        version: link:../../packages/valuation
       ioredis:
         specifier: 6.0.0
         version: 6.0.0

@@ -42,6 +42,11 @@ export const COPY = {
   /** The same disclosure for a list of runs, each with its own assumptions. */
   backtestListDisclosure:
     "Hypothetical results. These results are based on simulated backtests using historical data and the assumptions shown on each run's page (commissions, slippage, fills). They do not represent actual trading, may not reflect the impact of market factors such as liquidity, and benefit from hindsight. Past performance, actual or hypothetical, does not guarantee future results. This tool does not recommend any strategy.",
+  /** §5.6 required copy, above the DCF calculator. */
+  valuationCalculator:
+    "This model is a calculator driven by your assumptions. It is not a price target or recommendation.",
+  /** §12 valuation tools label, next to the model's outputs. */
+  valuationOutput: "Model output depends entirely on your inputs. It is not a price target.",
   /** Above a sweep's best combination: it was picked with hindsight. */
   sweepBest: (combinations: number, objective: string) =>
     `Best of ${combinations} parameter combinations by ${objective}, picked with hindsight on the same data. A choice made this way usually does worse on data it was not picked on; see a walk-forward run for an out-of-sample record.`,

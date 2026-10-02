@@ -4,7 +4,7 @@ import { createTestDatabase, withRole, type TestDatabase } from "../src/testing"
 import { TEMPLATE } from "./global-setup";
 
 /**
- * Row-level security on the per-user tables (migrations 10 and 13): a signed-in user sees and
+ * Row-level security on the per-user tables (migrations 10, 13 and 14): a signed-in user sees and
  * changes only their own rows; anonymous clients see nothing; the audit log and backtest results
  * are read-only to clients.
  */
@@ -51,6 +51,11 @@ beforeAll(async () => {
     );
     runIds.set(user, run.rows[0]!.run_id);
     await t.pool.query(
+      `insert into public.valuation_scenarios (user_id, security_id, name, inputs)
+       values ($1, $2, 'Base case', '{}')`,
+      [user, securityId],
+    );
+    await t.pool.query(
       `insert into public.backtest_results (run_id, user_id, summary, report, inputs)
        values ($1, $2, '{}', '{}', '{}')`,
       [run.rows[0]!.run_id, user],
@@ -77,6 +82,7 @@ describe("per-user tables", () => {
         "strategies",
         "backtest_runs",
         "backtest_results",
+        "valuation_scenarios",
       ]) {
         expect(await count(c, table), table).toBe(1);
       }

@@ -1,4 +1,5 @@
 import type { IsoDate } from "@market/calendar";
+import type { AnthropicClient } from "@market/ai";
 import type { AppEnv } from "@market/config";
 import type { Database } from "@market/db";
 import type {
@@ -58,6 +59,15 @@ export interface WorkerContext {
   alertDelivery?: AlertDelivery;
   /** Where backtests run (a worker thread in the worker); in-process when not set. */
   backtests?: BacktestRunner;
+  /** AI requests on the owner's Anthropic key; without it nothing is sent anywhere. */
+  ai?: AiServices;
+}
+
+export interface AiServices {
+  client: Pick<AnthropicClient, "createMessage">;
+  /** AI_MONTHLY_BUDGET_USD: no request starts that could take the month past it. */
+  monthlyBudgetUsd: number;
+  sentimentModel: string;
 }
 
 export interface AlertDelivery {

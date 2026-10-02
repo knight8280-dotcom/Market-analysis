@@ -20,6 +20,7 @@ import { dispatchQueuedBacktests } from "./jobs/backtest";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { runJob } from "./jobs/index";
 import { createLogger } from "./log";
+import { aiFromEnv } from "./ai";
 import { alertDeliveryFromEnv } from "./mail";
 import { buildProviders, routingFromEnv } from "./providers";
 import { JOBS, jobId } from "./queues";
@@ -47,6 +48,7 @@ import { loadUniverse } from "./universe";
  *   13f [--latest 2] [--names 01jun2026-31aug2026_form13f.zip] [--force]   (about 100 MB each)
  *   press-releases [--days 90] [--tickers AAPL,MSFT] [--limit 500]   (8-Ks already listed by `edgar`)
  *   news [--tickers AAPL,MSFT] [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
+ *   sentiment [--days 30] [--limit 200]  (needs ANTHROPIC_API_KEY; stays within AI_MONTHLY_BUDGET_USD)
  *   screener
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
@@ -118,6 +120,7 @@ async function main(): Promise<void> {
     dispatch: dispatcher,
     universe,
     alertDelivery: alertDeliveryFromEnv(env),
+    ai: aiFromEnv(env),
     backtests: inProcessRunner(db, { codeVersion: codeVersion(gitSha()) }),
   };
   const source = flag("source") ? ProviderId.parse(flag("source")) : undefined;
@@ -539,6 +542,15 @@ async function main(): Promise<void> {
             ...(list(flag("tickers")) ? { tickers: list(flag("tickers")) } : {}),
             ...(flag("from") ? { from: flag("from") } : {}),
             ...(flag("to") ? { to: flag("to") } : {}),
+          }),
+        );
+        break;
+
+      case "sentiment":
+        print(
+          await runJob(ctx, JOBS.scoreSentiment, {
+            ...(flag("days") ? { days: Number(flag("days")) } : {}),
+            ...(flag("limit") ? { limit: Number(flag("limit")) } : {}),
           }),
         );
         break;

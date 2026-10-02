@@ -371,6 +371,14 @@ export interface MarketNewsArticles {
   license_tier: string;
   published_at: Timestamp;
   publisher: string | null;
+  sentiment_at: Timestamp | null;
+  sentiment_label: string | null;
+  sentiment_model: string | null;
+  /**
+   * Model-estimated tone for the company, -1 (bad news) to 1 (good news); an estimate, never a signal.
+   */
+  sentiment_score: Numeric | null;
+  sentiment_version: string | null;
   source: string;
   source_id: string;
   summary: string | null;
@@ -542,6 +550,22 @@ export interface Notifications {
   read_at: Timestamp | null;
   title: string;
   user_id: string;
+}
+
+export interface OpsAiRequests {
+  cache_read_tokens: Generated<number>;
+  cache_write_tokens: Generated<number>;
+  cost_usd: Generated<Numeric>;
+  created_at: Generated<Timestamp>;
+  details: Generated<Json>;
+  error: string | null;
+  input_tokens: Generated<number>;
+  model: string;
+  output_tokens: Generated<number>;
+  prompt_version: string | null;
+  purpose: string;
+  request_id: Generated<Int8>;
+  status: string;
 }
 
 export interface OpsAlerts {
@@ -743,6 +767,7 @@ export interface DB {
   "market.security_symbol_history": MarketSecuritySymbolHistory;
   "market.short_interest": MarketShortInterest;
   notifications: Notifications;
+  "ops.ai_requests": OpsAiRequests;
   "ops.alerts": OpsAlerts;
   "ops.data_corrections": OpsDataCorrections;
   "ops.data_ingestion_runs": OpsDataIngestionRuns;

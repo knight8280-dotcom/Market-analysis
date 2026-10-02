@@ -24,6 +24,7 @@ export const SECRET_ENV_KEYS = [
   "TIINGO_API_KEY",
   "FINNHUB_API_KEY",
   "FINRA_API_CLIENT_SECRET",
+  "ANTHROPIC_API_KEY",
   "RESEND_API_KEY",
   "OWNER_PASSWORD_HASH",
   "SESSION_SECRET",
@@ -69,6 +70,12 @@ export const workerEnvSchema = z
     /** FINRA Query API "Public" credential (free; short interest). Both or neither. */
     FINRA_API_CLIENT_ID: z.string().min(1).optional(),
     FINRA_API_CLIENT_SECRET: z.string().min(1).optional(),
+    /** The owner's Anthropic API key (AI features, Phase 2 step I2 on); optional. */
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    /** Spending cap across all AI requests in a calendar month (UTC), in US dollars. */
+    AI_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1000).default(10),
+    /** Model for news sentiment: a small, inexpensive one is enough. */
+    AI_SENTIMENT_MODEL: z.string().min(1).default("claude-haiku-4-5-20251001"),
     RESEND_API_KEY: z.string().min(1).optional(),
     /** Where alert emails go: the owner's address (personal use only). */
     ALERT_EMAIL_TO: z.email().optional(),

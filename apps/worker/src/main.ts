@@ -6,6 +6,7 @@ import type { EventSink } from "./context";
 import { dispatchQueuedBacktests } from "./jobs/backtest";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { createLogger } from "./log";
+import { aiFromEnv } from "./ai";
 import { alertDeliveryFromEnv } from "./mail";
 import { buildProviders, routingFromEnv } from "./providers";
 import { QUEUES } from "./queues";
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
       events,
       universe,
       alertDelivery: alertDeliveryFromEnv(env),
+      ai: aiFromEnv(env),
       backtests: threadRunner({ db, databaseUrl: env.DATABASE_URL, log }),
     },
     { connection: () => new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }) },
@@ -60,6 +62,7 @@ async function main(): Promise<void> {
     releasesEnabled: providers.has("fred"),
     shortInterestEnabled: providers.has("finra"),
     newsEnabled: providers.has("finnhub"),
+    sentimentEnabled: Boolean(env.ANTHROPIC_API_KEY),
     macroSeries: providers.has("fred") ? DEFAULT_MACRO_SERIES : [],
   };
   const tick = async () => {

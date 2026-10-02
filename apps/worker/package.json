@@ -13,6 +13,7 @@
     "test:acceptance": "vitest run --config vitest.acceptance.config.ts"
   },
   "dependencies": {
+    "@market/ai": "workspace:*",
     "@market/alerts": "workspace:*",
     "@market/backtest": "workspace:*",
     "@market/calendar": "workspace:*",

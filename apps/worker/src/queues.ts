@@ -44,6 +44,7 @@ export const JOBS = {
   ingestPressRelease: "ingest-press-release",
   sweepPressReleases: "sweep-press-releases",
   pruneNews: "prune-news",
+  scoreSentiment: "score-news-sentiment",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -76,6 +77,7 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "ingest-press-release": QUEUES.filings,
   "sweep-press-releases": QUEUES.filings,
   "prune-news": QUEUES.maintenance,
+  "score-news-sentiment": QUEUES.news,
 };
 
 /**

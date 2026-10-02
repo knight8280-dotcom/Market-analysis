@@ -14,6 +14,7 @@ import { ingestInsiderFiling, sweepInsiders } from "./insiders";
 import { ingestForm13f, refreshCusips, schedule13f } from "./thirteenf";
 import { ingestShortInterest } from "./short-interest";
 import { ingestNews, ingestPressRelease, pruneNewsJob, sweepPressReleases } from "./news";
+import { scoreNewsSentiment } from "./sentiment";
 import { ingestEod, reconcileEod, scheduleEod } from "./ingest-eod";
 import { ingestMacro } from "./ingest-macro";
 import { ingestSecurities } from "./ingest-securities";
@@ -54,6 +55,7 @@ export const HANDLERS: Readonly<Record<JobName, Handler>> = {
   "ingest-press-release": ingestPressRelease,
   "sweep-press-releases": sweepPressReleases,
   "prune-news": (ctx) => pruneNewsJob(ctx),
+  "score-news-sentiment": scoreNewsSentiment,
 };
 
 export function runJob(ctx: WorkerContext, name: JobName, data: unknown): Promise<unknown> {

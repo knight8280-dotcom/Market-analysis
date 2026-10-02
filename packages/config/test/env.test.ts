@@ -115,6 +115,25 @@ describe("loadWorkerEnv", () => {
     );
   });
 
+  it("keeps AI off without a key, caps monthly spending and treats the key as secret", () => {
+    const off = loadWorkerEnv(worker);
+    expect(off.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(off.AI_MONTHLY_BUDGET_USD).toBe(10);
+    expect(off.AI_SENTIMENT_MODEL).toBe("claude-haiku-4-5-20251001");
+    const source = {
+      ...worker,
+      ANTHROPIC_API_KEY: "sk-ant-test-value-123",
+      AI_MONTHLY_BUDGET_USD: "2.5",
+    };
+    expect(loadWorkerEnv(source).AI_MONTHLY_BUDGET_USD).toBe(2.5);
+    expect(redactSecrets("key sk-ant-test-value-123 sent", source)).not.toContain(
+      "sk-ant-test-value-123",
+    );
+    expect(
+      problemsOf(() => loadWorkerEnv({ ...worker, AI_MONTHLY_BUDGET_USD: "-1" })).join("\n"),
+    ).toContain("AI_MONTHLY_BUDGET_USD");
+  });
+
   it("requires a declared SEC contact when EDGAR is enabled", () => {
     const problems = problemsOf(() => loadWorkerEnv({ ...worker, EDGAR_ENABLED: "true" }));
     expect(problems.join("\n")).toContain("APP_NAME and SEC_CONTACT_EMAIL are required");

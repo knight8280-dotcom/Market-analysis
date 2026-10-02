@@ -71,6 +71,17 @@ describe("calendar-driven schedule", () => {
     expect(ids("2026-09-30T07:30:00Z")).toContain("prune-news/2026-09-30");
   });
 
+  it("rates news sentiment after each news read only when an Anthropic key is set", () => {
+    const on = { ...DEFAULT_SCHEDULE, sentimentEnabled: true };
+    const rate = (at: string, cfg = on) =>
+      ids(at, cfg).filter((id) => id.startsWith("score-news-sentiment/"));
+    expect(rate("2026-09-30T11:29:00Z")).toEqual([]);
+    expect(rate("2026-09-30T11:30:00Z")).toEqual(["score-news-sentiment/2026-09-30/0730"]);
+    expect(rate("2026-09-30T21:30:00Z")).toEqual(["score-news-sentiment/2026-09-30/1730"]);
+    expect(rate("2026-10-01T03:30:00Z")).toEqual(["score-news-sentiment/2026-09-30/2330"]);
+    expect(rate("2026-10-01T03:30:00Z", DEFAULT_SCHEDULE)).toEqual([]);
+  });
+
   it("reads company news at 07:00 and 17:00 only when Finnhub is configured", () => {
     const on = { ...DEFAULT_SCHEDULE, newsEnabled: true };
     const news = (at: string, cfg = on) =>

@@ -30,6 +30,8 @@ export interface ScheduleConfig {
   pressReleasesAt: string;
   /** News past its retention period is deleted. */
   pruneNewsAt: string;
+  /** Sentiment for new stories, after each news read and the evening filings. */
+  sentimentAt: readonly string[];
   /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
   screenerAt: string;
   /** Earnings and economic calendars, refreshed before the open. */
@@ -42,6 +44,8 @@ export interface ScheduleConfig {
   releasesEnabled: boolean;
   shortInterestEnabled: boolean;
   newsEnabled: boolean;
+  /** An Anthropic key is set. */
+  sentimentEnabled: boolean;
   macroSeries: readonly string[];
 }
 
@@ -57,6 +61,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   newsAt: ["07:00", "17:00"],
   pressReleasesAt: "22:45",
   pruneNewsAt: "03:30",
+  sentimentAt: ["07:30", "17:30", "23:30"],
   screenerAt: "18:45",
   calendarsAt: "06:30",
   alertsAt: "18:50",
@@ -66,6 +71,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   releasesEnabled: false,
   shortInterestEnabled: false,
   newsEnabled: false,
+  sentimentEnabled: false,
   macroSeries: [],
 };
 
@@ -164,6 +170,16 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
         name: JOBS.ingestNews,
         data: {},
         jobId: jobId(JOBS.ingestNews, today, slot.replace(":", "")),
+      });
+    }
+  }
+  if (cfg.sentimentEnabled) {
+    const slot = [...cfg.sentimentAt].reverse().find((at) => etMinutes >= minutesOfDay(at));
+    if (slot) {
+      jobs.push({
+        name: JOBS.scoreSentiment,
+        data: {},
+        jobId: jobId(JOBS.scoreSentiment, today, slot.replace(":", "")),
       });
     }
   }

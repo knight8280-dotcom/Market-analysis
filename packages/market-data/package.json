@@ -14,7 +14,9 @@
     "./statements": "./src/statements.ts",
     "./edgar-report": "./src/edgar-report.ts",
     "./sectors": "./src/sectors.ts",
-    "./adapters/finnhub": "./src/adapters/finnhub.ts"
+    "./adapters/finnhub": "./src/adapters/finnhub.ts",
+    "./adapters/sec-ownership": "./src/adapters/sec-ownership.ts",
+    "./xml": "./src/xml.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

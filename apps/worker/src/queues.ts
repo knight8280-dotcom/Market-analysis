@@ -33,6 +33,8 @@ export const JOBS = {
   ingestReleases: "ingest-releases",
   evaluateAlerts: "evaluate-alerts",
   runBacktest: "run-backtest",
+  ingestInsider: "ingest-insider",
+  sweepInsiders: "sweep-insiders",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -55,6 +57,8 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "ingest-releases": QUEUES.macro,
   "evaluate-alerts": QUEUES.alerts,
   "run-backtest": QUEUES.backtest,
+  "ingest-insider": QUEUES.filings,
+  "sweep-insiders": QUEUES.filings,
 };
 
 /**

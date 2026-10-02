@@ -41,6 +41,7 @@ import { loadUniverse } from "./universe";
  *   edgar --tickers AAPL,MSFT | --ciks 320193,789019 [--facts-only]
  *   statements [--ciks 320193,789019]   (default: every registrant with facts)
  *   check-statements [--ciks ...]        (default: 10 large filers; live SEC requests)
+ *   insiders [--days 730] [--tickers AAPL,MSFT] [--limit 500]   (Form 4s already listed by `edgar`)
  *   screener
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
@@ -434,6 +435,53 @@ async function main(): Promise<void> {
           companies.push({ cik, fiscalYear: latest.fiscal_year, accession, statements });
         }
         print({ companies, httpStatusCounts: Object.fromEntries(edgar.http.statusCounts) });
+        break;
+      }
+
+      case "insiders": {
+        // Reads stored Form 4 filings that have not been read yet (one SEC request each).
+        const tickers = list(flag("tickers"));
+        const ciks = tickers
+          ? (
+              await db
+                .selectFrom("market.securities")
+                .select("cik")
+                .where(
+                  "ticker",
+                  "in",
+                  tickers.map((t) => t.toUpperCase()),
+                )
+                .where("cik", "is not", null)
+                .execute()
+            ).map((r) => r.cik!)
+          : undefined;
+        if (tickers && !ciks?.length) throw new Error("None of those tickers has a CIK yet");
+        const sweep = await runJob(ctx, JOBS.sweepInsiders, {
+          days: Number(flag("days") ?? 730),
+          ...(ciks ? { ciks } : {}),
+          ...(flag("limit") ? { limit: Number(flag("limit")) } : {}),
+        });
+        const jobs = await drain();
+        const read = await db
+          .selectFrom("market.insider_filings")
+          .select((eb) => eb.fn.countAll<string>().as("n"))
+          .executeTakeFirst();
+        const unreadable = await db
+          .selectFrom("market.insider_filing_errors")
+          .select(["accession_no", "error"])
+          .where("failed_at", ">=", new Date(started))
+          .execute();
+        const edgar = ctx.providers.get("sec_edgar");
+        print({
+          sweep,
+          jobs,
+          filingsStored: Number(read?.n ?? 0),
+          unreadable,
+          failures,
+          httpStatusCounts:
+            edgar instanceof SecEdgarProvider ? Object.fromEntries(edgar.http.statusCounts) : {},
+          seconds: (Date.now() - started) / 1000,
+        });
         break;
       }
 

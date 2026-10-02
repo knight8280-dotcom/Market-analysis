@@ -27,7 +27,7 @@ Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is
 | `packages/config`      | zod-validated env (`loadWorkerEnv`, `loadWebEnv`), secret redaction, production guards                                                                                                                                                                                                                                                                                                                                              |
 | `packages/db`          | Kysely client (`@market/db`), migration runner and schema fingerprint (`/migrations`), security audit (`/security`), test databases (`/testing`), generated types                                                                                                                                                                                                                                                                   |
 | `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                                                                                                                                                                                                                                                                       |
-| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine, statement builder and SEC report parser (ADR-020)                                                                                                                                                                                           |
+| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine, statement builder, SEC report parser (ADR-020) and Form 4 parser with a strict XML reader (ADR-031)                                                                                                                                         |
 | `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                                                                                                                                                                                                                                                             |
 | `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups                                                                                                                                                                                                                                              |
 | `packages/screener`    | screen JSON schema, SQL compiler that emits only whitelisted identifiers and binds every value, independent oracle, presets, snapshot math (ADR-021)                                                                                                                                                                                                                                                                                |
@@ -36,6 +36,7 @@ Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is
 | `packages/metrics`     | one definition of each series statistic: returns, volatility, Sharpe, Sortino, drawdown, CAGR, beta, correlation, correlation matrix, concentration (ADR-026)                                                                                                                                                                                                                                                                       |
 | `packages/valuation`   | two-stage DCF, sensitivity grid, multiples, peer median and percentile, figures as known on a date (ADR-027)                                                                                                                                                                                                                                                                                                                        |
 | `packages/backtest`    | strategy JSON schema, deterministic engine on point-in-time data, metrics, parameter sweeps, out-of-sample split, walk-forward, run requests, data fingerprint (ADR-025)                                                                                                                                                                                                                                                            |
+| `packages/ownership`   | Form 4 transaction-code legend in SEC's wording, insider roles, open-market purchase and sale totals, clusters of purchases by several insiders (descriptive; ADR-031)                                                                                                                                                                                                                                                              |
 | `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                                                                                                                                                                                                                                                                           |
 | `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, alert delivery (Resend), backtest runner (worker thread), operator CLI                                                                                                                                                                                                                                                                                  |
 | `apps/web`             | Next.js app for the owner: login, Markets dashboard (eight widgets, arranged and saved per user), ticker pages (lazy-loaded Lightweight Charts, indicators in a Web Worker above 5, drawing tools; Financials and Valuation tabs), screener, watchlists (SSE), portfolio, backtests, calendar (.ics), heatmap, alerts (one page per alert), notifications (header bell), data health, settings; ⌘K search; server-side queries only |
@@ -90,6 +91,7 @@ Raw prints are never overwritten.
 - `fundamentals_facts` holds XBRL facts keyed by CIK, not `security_id`, because one registrant can list several share classes. Joins go through `securities.cik`.
 - Every filing's copy of a fact is kept (unique on accession, taxonomy, concept, unit and period, `NULLS NOT DISTINCT`), so backtests can use point-in-time `filed_at`.
 - `filings` is keyed by `(accession_no, cik)`, because co-registrants share accession numbers.
+- `insider_filings` (one Form 4 or 4/A, with its reporting owners as JSON and its footnotes) and `insider_transactions` (its lines as filed) are keyed by the issuer's CIK, like facts: a Form 4 names its share class only in free text. Amendments sit beside the filings they amend and are never netted against them (ADR-031). `insider_filing_errors` remembers documents the parser refused, by parser version.
 
 ## Data flow
 
@@ -110,31 +112,32 @@ Raw prints are never overwritten.
 
 ### Jobs and schedules
 
-| Queue                 | Jobs                                                                            |
-| --------------------- | ------------------------------------------------------------------------------- |
-| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`    |
-| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                       |
-| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`                |
-| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                            |
-| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`                |
-| `alerts-evaluate`     | `evaluate-alerts` (one at a time; queued as data arrives and at 18:50; ADR-028) |
-| `monitor`             | `staleness-monitor`                                                             |
-| `backtest-run`        | `run-backtest` (one at a time, each in a worker thread; ADR-025)                |
-| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                             |
+| Queue                 | Jobs                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`                                      |
+| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                                                         |
+| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`, `ingest-insider` (one Form 4), `sweep-insiders` |
+| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                                                              |
+| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`                                                  |
+| `alerts-evaluate`     | `evaluate-alerts` (one at a time; queued as data arrives and at 18:50; ADR-028)                                   |
+| `monitor`             | `staleness-monitor`                                                                                               |
+| `backtest-run`        | `run-backtest` (one at a time, each in a worker thread; ADR-025)                                                  |
+| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                                                               |
 
 `dueJobs(now)` is a pure function of the market calendar:
 
-| When (exchange time)                                                    | Job                                                 |
-| ----------------------------------------------------------------------- | --------------------------------------------------- |
-| every minute                                                            | staleness monitor                                   |
-| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out                                         |
-| 02:00                                                                   | reconcile                                           |
-| 03:00                                                                   | partitions                                          |
-| 06:30                                                                   | earnings (Finnhub key) and economic releases (FRED) |
-| 18:00                                                                   | macro                                               |
-| 18:45                                                                   | screener snapshot (after the 18:30 EOD deadline)    |
-| 18:50                                                                   | every alert evaluated again, with email             |
-| 21:00                                                                   | EDGAR sweep (off-peak)                              |
+| When (exchange time)                                                    | Job                                                                  |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| every minute                                                            | staleness monitor                                                    |
+| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out                                                          |
+| 02:00                                                                   | reconcile                                                            |
+| 03:00                                                                   | partitions                                                           |
+| 06:30                                                                   | earnings (Finnhub key) and economic releases (FRED)                  |
+| 18:00                                                                   | macro                                                                |
+| 18:45                                                                   | screener snapshot (after the 18:30 EOD deadline)                     |
+| 18:50                                                                   | every alert evaluated again, with email                              |
+| 21:00                                                                   | EDGAR sweep (off-peak)                                               |
+| 22:30                                                                   | Form 4 sweep: documents the evening's refresh did not read (ADR-031) |
 
 Besides the calendar, a 3-second poll enqueues backtests the owner queued (`run-backtest/<run id>`) and fails runs left running long after their time limit.
 
@@ -163,6 +166,7 @@ The monitor opens a `staleness` alert on a breach and resolves it on recovery. R
 - Requests wait for a slot in a Redis sliding-window limiter (at most 8 grants in any 1-second window, across all processes, using Redis server time). If Redis is unreachable, no request is sent (fail closed).
 - 403, 429 and 5xx responses are retried with backoff.
 - New 10-K/10-Q filings trigger a companyfacts refresh for that CIK.
+- New Form 4 and 4/A filings filed in the last 30 days trigger a read of their XML (`ingest-insider/<accession>/v<parser version>`); older ones are read by the sweep or `pnpm worker insiders`.
 
 ## Licensing controls in code
 

@@ -247,3 +247,92 @@ export const EconomicRelease = Provenance.extend({
   release_date: IsoDateString,
 });
 export type EconomicRelease = z.infer<typeof EconomicRelease>;
+
+/** Form 4 transaction codes (SEC Form 4, General Instruction 8). */
+export const INSIDER_TRANSACTION_CODES = [
+  "P",
+  "S",
+  "V",
+  "A",
+  "D",
+  "F",
+  "I",
+  "M",
+  "C",
+  "E",
+  "H",
+  "O",
+  "X",
+  "G",
+  "L",
+  "W",
+  "Z",
+  "J",
+  "K",
+  "U",
+] as const;
+export const InsiderTransactionCode = z.enum(INSIDER_TRANSACTION_CODES);
+export type InsiderTransactionCode = z.infer<typeof InsiderTransactionCode>;
+
+/** A reporting person on a Form 4 (spec §5.13). */
+export const InsiderOwner = z.object({
+  cik: Cik.nullable(),
+  name: z.string().min(1),
+  is_director: z.boolean(),
+  is_officer: z.boolean(),
+  officer_title: z.string().nullable(),
+  is_ten_percent_owner: z.boolean(),
+  is_other: z.boolean(),
+  other_text: z.string().nullable(),
+});
+export type InsiderOwner = z.infer<typeof InsiderOwner>;
+
+/**
+ * One line of Table I (non-derivative) or Table II (derivative) of a Form 4, as filed. Values the
+ * filer left out (often explained in a footnote) are null, never zero.
+ */
+export const InsiderTransaction = z.object({
+  /** 1-based order in the filing: Table I lines first, then Table II. */
+  line: z.number().int().positive(),
+  derivative: z.boolean(),
+  security_title: z.string().min(1),
+  transaction_date: IsoDateString,
+  deemed_execution_date: IsoDateString.nullable(),
+  code: InsiderTransactionCode,
+  equity_swap: z.boolean(),
+  shares: finite.nonnegative().nullable(),
+  price: finite.nonnegative().nullable(),
+  acquired_disposed: z.enum(["A", "D"]).nullable(),
+  /** Shares held on this line's ownership (direct, or one indirect holding) after it. */
+  shares_after: finite.nonnegative().nullable(),
+  ownership: z.enum(["D", "I"]).nullable(),
+  ownership_nature: z.string().nullable(),
+  conversion_price: finite.nonnegative().nullable(),
+  exercise_date: IsoDateString.nullable(),
+  expiration_date: IsoDateString.nullable(),
+  underlying_title: z.string().nullable(),
+  underlying_shares: finite.nonnegative().nullable(),
+  footnote_ids: z.array(z.string()),
+});
+export type InsiderTransaction = z.infer<typeof InsiderTransaction>;
+
+/** A Form 4 or 4/A ownership document (EDGAR XML), with its transactions. */
+export const InsiderFiling = Provenance.extend({
+  accession_no: AccessionNo,
+  form_type: z.enum(["4", "4/A"]),
+  schema_version: z.string().nullable(),
+  period_of_report: IsoDateString,
+  /** For an amendment: the filing date of the Form 4 it amends. */
+  original_filing_date: IsoDateString.nullable(),
+  issuer_cik: Cik,
+  issuer_name: z.string().min(1),
+  issuer_symbol: z.string().nullable(),
+  owners: z.array(InsiderOwner).min(1),
+  /** The Rule 10b5-1(c) check box; null on filings made before the box existed. */
+  aff_10b5_1: z.boolean().nullable(),
+  no_longer_subject_to_section16: z.boolean(),
+  remarks: z.string().nullable(),
+  footnotes: z.record(z.string(), z.string()),
+  transactions: z.array(InsiderTransaction),
+});
+export type InsiderFiling = z.infer<typeof InsiderFiling>;

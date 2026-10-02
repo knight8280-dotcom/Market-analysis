@@ -33,6 +33,19 @@ const ROUTES: Record<string, () => string> = {
     fixture("recorded/companyfacts-CIK0000320193.trimmed.json"),
   "/submissions/CIK0000000042.json": () => fixture("submissions-CIK0000000042.json"),
   "/api/xbrl/companyfacts/CIK0000000042.json": () => fixture("companyfacts-CIK0000000042.json"),
+  // The five Form 4s at the top of Apple's recorded submissions (filed 2026-09-29).
+  ...Object.fromEntries(
+    [
+      "0001140361-26-038028",
+      "0001140361-26-038027",
+      "0001140361-26-038026",
+      "0001140361-26-038024",
+      "0001140361-26-038022",
+    ].map((acc) => [
+      `/Archives/edgar/data/320193/${acc.replaceAll("-", "")}/form4.xml`,
+      () => fixture(`recorded/form4/${acc}.xml`),
+    ]),
+  ),
 };
 
 function secProvider(now: () => Date) {
@@ -161,9 +174,15 @@ describe("attach-edgar-ids", () => {
   });
 
   it("sets SIC code, industry and sector from submissions, then loads filings and facts", async () => {
-    // The two queued filings jobs, the companyfacts jobs they queue, and the statement builds
-    // those queue.
-    expect(await h.drain()).toEqual({ ran: 6, failed: 0 });
+    // The two queued filings jobs, the companyfacts jobs they queue, the statement builds those
+    // queue, and a read of each of Apple's five Form 4s filed in the last 30 days (Phase 2 H1).
+    expect(await h.drain()).toEqual({ ran: 11, failed: 0 });
+    const insiders = await h.t.db
+      .selectFrom("market.insider_filings")
+      .select(["accession_no", "issuer_cik"])
+      .execute();
+    expect(insiders).toHaveLength(5);
+    expect(new Set(insiders.map((i) => i.issuer_cik))).toEqual(new Set(["0000320193"]));
 
     expect(await security("AAPL")).toEqual({
       cik: "0000320193",

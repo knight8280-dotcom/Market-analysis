@@ -262,6 +262,8 @@ importers:
 
   packages/metrics: {}
 
+  packages/ownership: {}
+
   packages/portfolio:
     dependencies:
       '@market/metrics':

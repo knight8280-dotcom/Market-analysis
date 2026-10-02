@@ -14,6 +14,7 @@ import { FRESHNESS_SLOS } from "../freshness";
 import { JOBS, jobId } from "../queues";
 import { insertFacts, insertFilings } from "../repo/edgar";
 import { queueAlertEvaluation } from "./alerts";
+import { queueInsiderFilings, RECENT_INSIDER_DAYS } from "./insiders";
 import { recordIssues, type IssueRow } from "../repo/quality";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
 import { applyEdgarEntity, securitiesMissingCik, setCik } from "../repo/securities";
@@ -162,6 +163,14 @@ export async function ingestFilings(ctx: WorkerContext, raw: unknown) {
         kinds: ["new_filing"],
       });
     }
+    // New Form 4s are read from their XML (Phase 2 step H1); older ones are left to the sweep.
+    const recent = ctx.clock().getTime() - RECENT_INSIDER_DAYS * 86_400_000;
+    await queueInsiderFilings(
+      ctx,
+      inserted.filter(
+        (f) => (f.form_type === "4" || f.form_type === "4/A") && f.filed_at.getTime() >= recent,
+      ),
+    );
     // New periodic reports carry new XBRL facts: refresh companyfacts (fundamentals SLO: 24h).
     const periodic = inserted
       .filter((f) => (FRESHNESS_SLOS.fundamentals.forms as readonly string[]).includes(f.form_type))

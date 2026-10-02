@@ -57,6 +57,9 @@ describe("calendar-driven schedule", () => {
     const evening = ids("2026-10-01T01:00:00Z", cfg);
     expect(evening).toContain("ingest-macro/2026-09-30/DGS10");
     expect(evening).toContain("schedule-edgar/2026-09-30");
+    // 22:30 EDT: Form 4 documents the evening's filings refresh did not read.
+    expect(evening).not.toContain("sweep-insiders/2026-09-30");
+    expect(ids("2026-10-01T02:30:00Z", cfg)).toContain("sweep-insiders/2026-09-30");
   });
 
   it("omits EDGAR and macro when not configured", () => {
@@ -64,5 +67,6 @@ describe("calendar-driven schedule", () => {
     expect(
       evening.some((id) => id.startsWith("schedule-edgar/") || id.startsWith("ingest-macro/")),
     ).toBe(false);
+    expect(ids("2026-10-01T03:00:00Z").some((id) => id.startsWith("sweep-insiders/"))).toBe(false);
   });
 });

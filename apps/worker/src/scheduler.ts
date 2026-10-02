@@ -18,6 +18,8 @@ export interface ScheduleConfig {
   macroAt: string;
   /** EDGAR sweeps run off-peak (SEC asks for bulk work outside business hours). */
   edgarAt: string;
+  /** Form 4 documents the evening's filings refresh did not read (after edgarAt). */
+  insidersAt: string;
   /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
   screenerAt: string;
   /** Earnings and economic calendars, refreshed before the open. */
@@ -37,6 +39,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   partitionsAt: "03:00",
   macroAt: "18:00",
   edgarAt: "21:00",
+  insidersAt: "22:30",
   screenerAt: "18:45",
   calendarsAt: "06:30",
   alertsAt: "18:50",
@@ -113,6 +116,9 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.edgarAt)) {
     jobs.push({ name: JOBS.scheduleEdgar, data: {}, jobId: jobId(JOBS.scheduleEdgar, today) });
+  }
+  if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.insidersAt)) {
+    jobs.push({ name: JOBS.sweepInsiders, data: {}, jobId: jobId(JOBS.sweepInsiders, today) });
   }
   return jobs;
 }

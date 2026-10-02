@@ -10,6 +10,7 @@ import {
   scheduleEdgar,
 } from "./edgar";
 import { ensurePartitions } from "./ensure-partitions";
+import { ingestInsiderFiling, sweepInsiders } from "./insiders";
 import { ingestEod, reconcileEod, scheduleEod } from "./ingest-eod";
 import { ingestMacro } from "./ingest-macro";
 import { ingestSecurities } from "./ingest-securities";
@@ -40,6 +41,8 @@ export const HANDLERS: Readonly<Record<JobName, Handler>> = {
   "ingest-releases": ingestReleases,
   "evaluate-alerts": evaluateAlerts,
   "run-backtest": runBacktestJob,
+  "ingest-insider": ingestInsiderFiling,
+  "sweep-insiders": sweepInsiders,
 };
 
 export function runJob(ctx: WorkerContext, name: JobName, data: unknown): Promise<unknown> {

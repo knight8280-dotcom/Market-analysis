@@ -18,7 +18,7 @@ Research behind these rows: `docs/BRIEF.md`.
 | Finnhub (`finnhub`)        | **personal plan, owner only**; optional; adapter built, SHAPE UNVERIFIED until the key arrives | `personal_dev`  | owner only                                      | earnings calendar                         | —          | https://finnhub.io/pricing                                                      |
 | Twelve Data (`twelvedata`) | not contracted, no adapter yet                                                                 | `personal_dev`  | no                                              | —                                         | —          | https://twelvedata.com/pricing-business                                         |
 | Massive (`massive`)        | not contracted, no adapter yet                                                                 | `personal_dev`  | no                                              | —                                         | —          | https://massive.com/business-stocks                                             |
-| SEC EDGAR (`sec_edgar`)    | public                                                                                         | `public_domain` | yes                                             | fundamentals, filings                     | 2026-09-30 | https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data |
+| SEC EDGAR (`sec_edgar`)    | public                                                                                         | `public_domain` | yes                                             | fundamentals, filings (incl. Form 4)      | 2026-10-02 | https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data |
 | FRED (`fred`)              | public API (free key)                                                                          | `public_domain` | yes (series without third-party copyright only) | macro, economic release dates             | 2026-09-30 | https://fred.stlouisfed.org/docs/api/terms_of_use.html                          |
 | U.S. Treasury (`treasury`) | public, no adapter yet                                                                         | `public_domain` | yes                                             | macro                                     | —          | —                                                                               |
 
@@ -45,10 +45,12 @@ Research behind these rows: `docs/BRIEF.md`.
   - `https://data.sec.gov/submissions/CIK##########.json` (recent filings only; older pages and `submissions.zip` are the Phase 1 bulk path). The same response gives the registrant's SIC code, which sets `sic_code`, `industry` and `sector` (ADR-016).
   - `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`
   - `https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/FilingSummary.xml` and its `R<n>.htm` statement pages, only for the statement check (`pnpm worker check-statements`, ADR-020)
+  - `https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/<form4>.xml`: each Form 4 and 4/A ownership document (ADR-031). One request per filing, read once and kept.
 - **Fixtures:**
   - hand-built cases with made-up values (registrant CIK 0000000042);
   - trimmed **live recordings** from 2026-09-30 (`test/fixtures/sec-edgar/recorded/`): Apple submissions and companyfacts, a numeric-string CIK (ExxonMobil Holdings Corp) and `fy: 0`/`fp: ""` facts (Wells Fargo). SEC data is public domain, so recordings may be committed.
 - **Response shape verified 2026-09-30** on the live run.
+- **Form 4 XML verified 2026-10-02:** thirteen documents recorded verbatim (`test/fixtures/sec-edgar/recorded/form4/`, schemas X0508 and X0609), and a live read of the 683 Form 4s filed in the previous 90 days by the 49 registrants in the development database: all HTTP 200, none refused by the parser.
 - **`acceptanceDateTime` is true UTC** (verified 2026-09-30). Apple's FY2025 10-K shows `2025-10-31T10:01:26.000Z` in the JSON and "Accepted 2025-10-31 06:01:26" (Eastern) on its index page.
 - **Live acceptance run done 2026-09-30:** 50 companies, 101 requests, all HTTP 200, 1,461,821 facts and 119,717 filings. The User-Agent is `Market Analysis <owner email>`; the email is set only in env and never committed.
 

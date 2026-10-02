@@ -190,6 +190,13 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - The **five-year history** needs prices and filings; it uses figures as first reported, known by each month end.
 - `/settings` can turn Valuation off; saved scenarios are kept.
 
+## Insider transactions (Form 4)
+
+- Needs EDGAR (`EDGAR_ENABLED=true`, `APP_NAME`, `SEC_CONTACT_EMAIL`). New Form 4s are read automatically: the evening filings refresh (21:00 ET) queues each one filed in the last 30 days, and a sweep at 22:30 ET picks up any it missed. Each is one SEC request through the shared limiter.
+- **History, once:** `pnpm worker insiders --days 730` reads every stored Form 4 from the last two years that has not been read (about 15,000 requests for 50 large companies, roughly half an hour). `--tickers AAPL,MSFT` limits it; `--limit 500` caps one run. It prints how many were read, any it could not read, and SEC's HTTP status counts.
+- **Unreadable filings** (no XML, or a document the parser refuses) are listed in `market.insider_filing_errors` with the reason and are not fetched again until the parser version changes (`INSIDER_PARSER_VERSION` in `apps/worker/src/jobs/insiders.ts`). After fixing the parser, raise the version and run the history command again: it reads them, and re-reads stored filings, at the new version.
+- A Form 4 about another company (for example one Goldman Sachs filed as a large holder elsewhere) is stored under that company's CIK and shown only there.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

@@ -227,6 +227,67 @@ export interface MarketFundamentalsFacts {
   value: Numeric;
 }
 
+export interface MarketInsiderFilingErrors {
+  accession_no: string;
+  cik: string;
+  error: string;
+  failed_at: Generated<Timestamp>;
+  parser_version: number;
+}
+
+export interface MarketInsiderFilings {
+  accession_no: string;
+  /**
+   * The Rule 10b5-1(c) check box; null on filings made before the box existed (2023).
+   */
+  aff_10b5_1: boolean | null;
+  fetched_at: Timestamp;
+  filed_at: Timestamp;
+  footnotes: Generated<Json>;
+  form_type: string;
+  issuer_cik: string;
+  issuer_name: string;
+  issuer_symbol: string | null;
+  no_longer_subject_to_section16: Generated<boolean>;
+  original_filing_date: string | null;
+  /**
+   * Reporting owners as filed: [{cik, name, is_director, is_officer, officer_title, is_ten_percent_owner, is_other, other_text}].
+   */
+  owners: Json;
+  parser_version: number;
+  period_of_report: string;
+  remarks: string | null;
+  schema_version: string | null;
+  source: Generated<string>;
+  url: string;
+}
+
+export interface MarketInsiderTransactions {
+  accession_no: string;
+  acquired_disposed: string | null;
+  code: string;
+  conversion_price: Numeric | null;
+  deemed_execution_date: string | null;
+  derivative: boolean;
+  equity_swap: Generated<boolean>;
+  exercise_date: string | null;
+  expiration_date: string | null;
+  footnote_ids: Generated<string[]>;
+  line: number;
+  ownership: string | null;
+  ownership_nature: string | null;
+  price: Numeric | null;
+  security_title: string;
+  shares: Numeric | null;
+  /**
+   * Shares held after this line on its own ownership line (direct, or one indirect holding).
+   */
+  shares_after: Numeric | null;
+  transaction_date: string;
+  underlying_shares: Numeric | null;
+  underlying_title: string | null;
+}
+
 export interface MarketMacroObservations {
   date: string;
   ingested_at: Generated<Timestamp>;
@@ -545,6 +606,9 @@ export interface DB {
   "market.filings": MarketFilings;
   "market.financial_statements": MarketFinancialStatements;
   "market.fundamentals_facts": MarketFundamentalsFacts;
+  "market.insider_filing_errors": MarketInsiderFilingErrors;
+  "market.insider_filings": MarketInsiderFilings;
+  "market.insider_transactions": MarketInsiderTransactions;
   "market.macro_observations": MarketMacroObservations;
   "market.macro_series": MarketMacroSeries;
   "market.prices_daily": MarketPricesDaily;

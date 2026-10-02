@@ -141,6 +141,7 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 ## Feature switches
 
 - `/settings` lists the features that ship behind a switch (ADR-024). "Turn off" hides a feature's pages and menu entry and keeps its data; "Use default" removes your override. Overrides are rows in `ops.feature_flags`.
+- Switches after Phase 2a, all on by default: Backtests, Portfolio risk (the risk panel and allocation by asset class; returns and holdings stay), Valuation, More alert types, Notifications, Chart drawings and Customizable dashboard (off shows the standard layout).
 
 ## Alerts
 

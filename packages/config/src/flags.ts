@@ -15,6 +15,12 @@ export const FEATURE_FLAGS = {
     description: "Strategy builder, backtest runs and their reports.",
     default: true,
   },
+  portfolio_risk: {
+    label: "Portfolio risk",
+    description:
+      "Volatility, Sharpe and Sortino, drawdown, beta and correlations, concentration, daily P&L and allocation by asset class on the portfolio page.",
+    default: true,
+  },
   valuation: {
     label: "Valuation",
     description:

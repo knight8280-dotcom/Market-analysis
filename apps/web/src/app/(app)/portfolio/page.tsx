@@ -25,6 +25,7 @@ import { RiskPanel } from "../../../components/portfolio/risk-panel";
 import { TransactionForm } from "../../../components/portfolio/tx-form";
 import { requireOwner } from "../../../server/auth/owner";
 import { db } from "../../../server/db";
+import { flagEnabled } from "../../../server/flags";
 import { assertDisplayable, lastUpdated, priceSource, sourceInfo } from "../../../server/market";
 import { listPortfolios, portfolioTransactions, portfolioView } from "../../../server/portfolio";
 import { createPortfolio, deletePortfolio, deleteTransaction } from "./actions";
@@ -167,6 +168,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
     ? await portfolioView(database, source, session, txs, selected.benchmark)
     : null;
   const report = view?.report;
+  const riskOn = await flagEnabled("portfolio_risk");
   const info = (id: string) => view?.securities.get(id);
   const sectors = new Map<string, number>();
   for (const p of report?.positions ?? []) {
@@ -301,12 +303,14 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
             </CardContent>
           </Card>
 
-          <RiskPanel
-            risk={view.risk}
-            benchmark={view.benchmark?.ticker ?? null}
-            riskFreeStored={view.riskFree}
-            tickers={(id) => info(id)?.ticker ?? id}
-          />
+          {riskOn ? (
+            <RiskPanel
+              risk={view.risk}
+              benchmark={view.benchmark?.ticker ?? null}
+              riskFreeStored={view.riskFree}
+              tickers={(id) => info(id)?.ticker ?? id}
+            />
+          ) : null}
 
           {report.warnings.length ? (
             <div
@@ -416,14 +420,16 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
                 description="Shares of the portfolio's value, with cash"
               />
               <CardContent className="flex flex-col gap-5">
-                <section className="flex flex-col gap-2">
-                  <h3 className="text-xs font-medium text-muted-foreground">By asset class</h3>
-                  <AllocationList
-                    label="Allocation by asset class"
-                    items={byClass}
-                    total={report.value}
-                  />
-                </section>
+                {riskOn ? (
+                  <section className="flex flex-col gap-2">
+                    <h3 className="text-xs font-medium text-muted-foreground">By asset class</h3>
+                    <AllocationList
+                      label="Allocation by asset class"
+                      items={byClass}
+                      total={report.value}
+                    />
+                  </section>
+                ) : null}
                 <section className="flex flex-col gap-2">
                   <h3 className="text-xs font-medium text-muted-foreground">
                     By sector (SIC-based)

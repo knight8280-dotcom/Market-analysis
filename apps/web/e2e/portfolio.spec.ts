@@ -100,3 +100,51 @@ test("portfolio: rejected imports change nothing; a CSV import shows holdings an
   await page.getByRole("button", { name: "Delete portfolio" }).click();
   await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(0);
 });
+
+test("the portfolio risk switch hides the risk measures and keeps the returns", async ({
+  page,
+}) => {
+  const name = `E2E risk switch ${Date.now()}`;
+  await signIn(page, "/portfolio");
+  await page.getByLabel("Portfolio name").fill(name);
+  await page.getByRole("button", { name: "Create" }).click();
+  const link = page.getByRole("link", { name: new RegExp(name) });
+  await expect(link).toHaveAttribute("aria-current", "page");
+  await page.getByLabel("Or paste CSV").fill(LEDGER);
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Imported 5 transactions." }),
+  ).toBeVisible();
+  await expect(page.getByTestId("risk-volatility")).toBeVisible();
+  const url = new URL(page.url());
+  url.search = new URLSearchParams({ id: url.searchParams.get("id") ?? "" }).toString();
+  const matrix = page.getByRole("table", { name: "Correlation of daily returns between holdings" });
+
+  await page.goto("/settings");
+  const row = page.getByTestId("flag-portfolio_risk");
+  const reset = row.getByRole("button", { name: "Use default" });
+  if (await reset.count()) await reset.click();
+  await row.getByRole("button", { name: "Turn off Portfolio risk" }).click();
+  await expect(row).toHaveAttribute("data-enabled", "false");
+  try {
+    await page.goto(url.toString());
+    await expect(link).toHaveAttribute("aria-current", "page");
+    await expect(page.getByTestId("stat-twr")).toContainText("%");
+    await expect(page.getByTestId("holding-TEST_DIV")).toContainText("60");
+    await expect(page.getByTestId("risk-volatility")).toHaveCount(0);
+    await expect(matrix).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Allocation by asset class" })).toHaveCount(0);
+  } finally {
+    await page.goto("/settings");
+    await page
+      .getByTestId("flag-portfolio_risk")
+      .getByRole("button", { name: "Use default" })
+      .click();
+    await expect(page.getByTestId("flag-portfolio_risk")).toHaveAttribute("data-enabled", "true");
+  }
+  await page.goto(url.toString());
+  await expect(page.getByTestId("risk-volatility")).toBeVisible();
+  await expect(matrix).toBeVisible();
+  await page.getByRole("button", { name: "Delete portfolio" }).click();
+  await expect(link).toHaveCount(0);
+});

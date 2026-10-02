@@ -246,6 +246,7 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Portfolio risk is measured on the time-weighted index at each market session, so deposits and withdrawals are never gains or losses; days that are not sessions (a weekend dividend) fold into the next session. Daily P&L is value less the previous value less that day's external flow, so the P&L adds up to value less money put in.
   - Holdings' correlations use a year of total-return (adjusted) closes and only closes on the day itself: carrying a stale close forward would add false zero returns, and raw closes would turn a split into a crash.
   - Each measure's method and the risk-free source are in a keyboard-reachable tooltip on the portfolio page.
+  - Behind the `portfolio_risk` flag, on by default (registered at the Phase 2a acceptance check, which found the risk panel shipped without one). Off hides the risk panel and the allocation by asset class; returns, holdings and the sector allocation stay.
 - **Consequences:** both pages agree by construction; the extended spreadsheet-style fixture (`packages/portfolio/scripts/make_fixture.py`) checks the portfolio figures within 0.01%, and the backtest fixture keeps checking the shared code. Annualizing the portfolio's time-weighted return stays on 365-day years, like XIRR (ADR-023).
 
 ## ADR-027: Valuation as a calculator over filed figures, with point-in-time history

@@ -30,6 +30,7 @@ export const DATASETS = [
   "earnings",
   "institutional_holdings",
   "short_interest",
+  "news",
 ] as const;
 export const Dataset = z.enum(DATASETS);
 export type Dataset = z.infer<typeof Dataset>;
@@ -242,6 +243,30 @@ export const EarningsEvent = Provenance.extend({
   revenue_actual: finite.nullable(),
 });
 export type EarningsEvent = z.infer<typeof EarningsEvent>;
+
+/**
+ * A news item (spec §5.12): an article from a licensed news feed, or a company's press release
+ * filed with SEC. Headline, summary and link as the source gives them; nothing is rewritten.
+ */
+export const NewsItem = Provenance.extend({
+  /** The source's id: Finnhub's article id, or the 8-K accession number and exhibit file. */
+  source_id: z.string().min(1).max(200),
+  url: z.url({ protocol: /^https?$/ }).max(2000),
+  headline: z.string().trim().min(1).max(500),
+  /**
+   * True when the headline is our description of what was filed (an exhibit without a readable
+   * headline), not the item's own words.
+   */
+  described: z.boolean(),
+  summary: z.string().trim().min(1).max(5000).nullable(),
+  /** Who published it: the news outlet, or the filing company. */
+  publisher: z.string().trim().min(1).max(200).nullable(),
+  category: z.string().trim().min(1).max(100).nullable(),
+  published_at: z.date(),
+  /** Symbols the source tags the item with (Finnhub's "related"); empty for filings. */
+  symbols: z.array(z.string().trim().min(1).max(20)).max(50),
+});
+export type NewsItem = z.infer<typeof NewsItem>;
 
 /** A scheduled economic data release (FRED release dates). */
 export const EconomicRelease = Provenance.extend({

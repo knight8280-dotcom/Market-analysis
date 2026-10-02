@@ -1,0 +1,57 @@
+[
+  {
+    "category": "company",
+    "datetime": 1790755200,
+    "headline": "TEST_DIV Example Corp raises its quarterly dividend",
+    "id": 9000001,
+    "image": "https://example.invalid/image.jpg",
+    "related": "TEST_DIV",
+    "source": "Example Wire",
+    "summary": "Example Corp said its board approved a higher dividend.",
+    "url": "https://news.example.invalid/2026/10/01/dividend?utm_source=finnhub"
+  },
+  {
+    "category": "company",
+    "datetime": 1790683200,
+    "headline": "Two example companies announce a supply agreement",
+    "id": 9000002,
+    "image": "",
+    "related": "TEST_DIV,TEST_SPLIT4",
+    "source": "Example Daily",
+    "summary": "",
+    "url": "https://www.example.invalid/markets/supply-agreement"
+  },
+  {
+    "category": "company",
+    "datetime": 1790676000,
+    "headline": "A link that is not a web page",
+    "id": 9000003,
+    "image": "",
+    "related": "TEST_DIV",
+    "source": "Example Daily",
+    "summary": "Left out.",
+    "url": "javascript:alert(1)"
+  },
+  {
+    "category": "company",
+    "datetime": 1790672400,
+    "headline": "",
+    "id": 9000004,
+    "image": "",
+    "related": "TEST_DIV",
+    "source": "Example Daily",
+    "summary": "No headline: left out.",
+    "url": "https://news.example.invalid/no-headline"
+  },
+  {
+    "category": "company",
+    "datetime": 0,
+    "headline": "An impossible date",
+    "id": 9000005,
+    "image": "",
+    "related": "TEST_DIV",
+    "source": "Example Daily",
+    "summary": "Left out.",
+    "url": "https://news.example.invalid/no-date"
+  }
+]

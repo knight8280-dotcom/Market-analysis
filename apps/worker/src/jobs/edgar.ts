@@ -15,6 +15,7 @@ import { JOBS, jobId } from "../queues";
 import { insertFacts, insertFilings } from "../repo/edgar";
 import { queueAlertEvaluation } from "./alerts";
 import { queueInsiderFilings, RECENT_INSIDER_DAYS } from "./insiders";
+import { queuePressReleases, RECENT_PRESS_DAYS } from "./news";
 import { recordIssues, type IssueRow } from "../repo/quality";
 import { emptyCounts, finishRun, startRun } from "../repo/runs";
 import { applyEdgarEntity, securitiesMissingCik, setCik } from "../repo/securities";
@@ -169,6 +170,15 @@ export async function ingestFilings(ctx: WorkerContext, raw: unknown) {
       ctx,
       inserted.filter(
         (f) => (f.form_type === "4" || f.form_type === "4/A") && f.filed_at.getTime() >= recent,
+      ),
+    );
+    // New 8-Ks with exhibits are read for a press release (Phase 2 step I1).
+    const recentPress = ctx.clock().getTime() - RECENT_PRESS_DAYS * 86_400_000;
+    await queuePressReleases(
+      ctx,
+      inserted.filter(
+        (f) =>
+          f.form_type === "8-K" && f.items.includes("9.01") && f.filed_at.getTime() >= recentPress,
       ),
     );
     // New periodic reports carry new XBRL facts: refresh companyfacts (fundamentals SLO: 24h).

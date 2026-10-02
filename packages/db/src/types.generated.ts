@@ -355,6 +355,43 @@ export interface MarketMacroSeries {
   units: string | null;
 }
 
+export interface MarketNewsArticles {
+  article_id: Generated<Int8>;
+  category: string | null;
+  /**
+   * True when the headline is our description of what was filed (an exhibit without a readable headline), not the item's own words.
+   */
+  described: Generated<boolean>;
+  /**
+   * The earlier article this one copies (a near-identical headline within two days); copies are hidden behind it, not deleted.
+   */
+  duplicate_of: Int8 | null;
+  fetched_at: Timestamp;
+  headline: string;
+  license_tier: string;
+  published_at: Timestamp;
+  publisher: string | null;
+  source: string;
+  source_id: string;
+  summary: string | null;
+  url: string;
+  url_key: string;
+}
+
+export interface MarketNewsTickers {
+  article_id: Int8;
+  security_id: Int8;
+}
+
+export interface MarketPressReleaseChecks {
+  accession_no: string;
+  article_id: Int8 | null;
+  checked_at: Timestamp;
+  cik: string;
+  outcome: string;
+  reader_version: number;
+}
+
 export interface MarketPricesDaily {
   close: Numeric;
   date: string;
@@ -694,6 +731,9 @@ export interface DB {
   "market.institutional_holdings": MarketInstitutionalHoldings;
   "market.macro_observations": MarketMacroObservations;
   "market.macro_series": MarketMacroSeries;
+  "market.news_articles": MarketNewsArticles;
+  "market.news_tickers": MarketNewsTickers;
+  "market.press_release_checks": MarketPressReleaseChecks;
   "market.prices_daily": MarketPricesDaily;
   "market.prices_daily_adjusted": MarketPricesDailyAdjusted;
   "market.provider_symbols": MarketProviderSymbols;

@@ -3,9 +3,15 @@ import { z } from "zod";
 import { ProviderResponseError } from "../errors";
 import { HttpClient, type HttpClientOptions, type RateLimiter } from "../http";
 import { BaseProvider } from "../provider";
-import { FilingRecord, FundamentalFact } from "../types";
+import { FilingRecord, FundamentalFact, NewsItem } from "../types";
 import { parseVendor } from "./common";
 import { dataSetLinks, SEC_LISTING_PAGES, type DataSetFile } from "./sec-datasets";
+import {
+  filedDescription,
+  filingIndexDocuments,
+  pressReleaseExhibit,
+  readPressRelease,
+} from "./sec-press";
 
 /**
  * SEC EDGAR adapter (spec §2.3): company ticker map, submissions (filing metadata) and XBRL
@@ -316,6 +322,54 @@ export class SecEdgarProvider extends BaseProvider {
     }
     const folder = `${Number(padCik(req.cik))}/${req.accession.replaceAll("-", "")}`;
     return this.http.getText(`${this.wwwBase}/Archives/edgar/data/${folder}/${req.file}`);
+  }
+
+  /**
+   * The press release an 8-K carries as Exhibit 99, as a news item (Phase 2 step I1), or null
+   * when the filing has no such exhibit. Two requests: the filing index, then the exhibit.
+   */
+  async getPressRelease(req: {
+    cik: string;
+    accession: string;
+    company: string;
+    items: readonly string[];
+    filedAt: Date;
+  }): Promise<NewsItem | null> {
+    const index = await this.getArchiveDocument({
+      cik: req.cik,
+      accession: req.accession,
+      file: `${req.accession}-index.htm`,
+    });
+    const exhibit = pressReleaseExhibit(filingIndexDocuments(index));
+    if (!exhibit) return null;
+    const html = await this.getArchiveDocument({
+      cik: req.cik,
+      accession: req.accession,
+      file: exhibit.file,
+    });
+    const read = readPressRelease(html);
+    const folder = `${Number(padCik(req.cik))}/${req.accession.replaceAll("-", "")}`;
+    return parseVendor(
+      this.id,
+      NewsItem,
+      {
+        source: this.id,
+        source_symbol: padCik(req.cik),
+        fetched_at: this.now(),
+        as_of: req.filedAt,
+        license_tier: "public_domain",
+        source_id: `${req.accession}/${exhibit.file}`,
+        url: `${this.wwwBase}/Archives/edgar/data/${folder}/${exhibit.file}`,
+        headline: read.headline ?? filedDescription(req.company, exhibit.type, req.items),
+        described: read.headline === null,
+        summary: read.lead,
+        publisher: req.company,
+        category: "press release",
+        published_at: req.filedAt,
+        symbols: [],
+      },
+      "press release",
+    );
   }
 
   /** Data set files linked from SEC's listing page (Form 13F data sets or fails-to-deliver). */

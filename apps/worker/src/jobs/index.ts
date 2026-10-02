@@ -13,6 +13,7 @@ import { ensurePartitions } from "./ensure-partitions";
 import { ingestInsiderFiling, sweepInsiders } from "./insiders";
 import { ingestForm13f, refreshCusips, schedule13f } from "./thirteenf";
 import { ingestShortInterest } from "./short-interest";
+import { ingestNews, ingestPressRelease, pruneNewsJob, sweepPressReleases } from "./news";
 import { ingestEod, reconcileEod, scheduleEod } from "./ingest-eod";
 import { ingestMacro } from "./ingest-macro";
 import { ingestSecurities } from "./ingest-securities";
@@ -49,6 +50,10 @@ export const HANDLERS: Readonly<Record<JobName, Handler>> = {
   "ingest-13f": ingestForm13f,
   "schedule-13f": (ctx) => schedule13f(ctx),
   "ingest-short-interest": ingestShortInterest,
+  "ingest-news": ingestNews,
+  "ingest-press-release": ingestPressRelease,
+  "sweep-press-releases": sweepPressReleases,
+  "prune-news": (ctx) => pruneNewsJob(ctx),
 };
 
 export function runJob(ctx: WorkerContext, name: JobName, data: unknown): Promise<unknown> {

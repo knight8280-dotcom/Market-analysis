@@ -63,6 +63,23 @@ describe("calendar-driven schedule", () => {
     // 23:00 EDT: one look at SEC's 13F data set listing.
     expect(ids("2026-10-01T02:30:00Z", cfg)).not.toContain("schedule-13f/2026-09-30");
     expect(ids("2026-10-01T03:00:00Z", cfg)).toContain("schedule-13f/2026-09-30");
+    // 22:45 EDT: press releases in 8-Ks the filings refresh did not read.
+    expect(ids("2026-10-01T02:44:00Z", cfg)).not.toContain("sweep-press-releases/2026-09-30");
+    expect(ids("2026-10-01T02:45:00Z", cfg)).toContain("sweep-press-releases/2026-09-30");
+    // 03:30 EDT: old news is deleted, whatever is configured.
+    expect(ids("2026-09-30T07:29:00Z")).not.toContain("prune-news/2026-09-30");
+    expect(ids("2026-09-30T07:30:00Z")).toContain("prune-news/2026-09-30");
+  });
+
+  it("reads company news at 07:00 and 17:00 only when Finnhub is configured", () => {
+    const on = { ...DEFAULT_SCHEDULE, newsEnabled: true };
+    const news = (at: string, cfg = on) =>
+      ids(at, cfg).filter((id) => id.startsWith("ingest-news/"));
+    expect(news("2026-09-30T10:59:00Z")).toEqual([]);
+    expect(news("2026-09-30T11:00:00Z")).toEqual(["ingest-news/2026-09-30/0700"]);
+    expect(news("2026-09-30T20:59:00Z")).toEqual(["ingest-news/2026-09-30/0700"]);
+    expect(news("2026-09-30T21:00:00Z")).toEqual(["ingest-news/2026-09-30/1700"]);
+    expect(news("2026-09-30T21:00:00Z", DEFAULT_SCHEDULE)).toEqual([]);
   });
 
   it("checks FINRA short interest at 19:30 only when its credential is set", () => {
@@ -80,5 +97,8 @@ describe("calendar-driven schedule", () => {
       evening.some((id) => id.startsWith("schedule-edgar/") || id.startsWith("ingest-macro/")),
     ).toBe(false);
     expect(ids("2026-10-01T03:00:00Z").some((id) => id.startsWith("sweep-insiders/"))).toBe(false);
+    expect(ids("2026-10-01T03:00:00Z").some((id) => id.startsWith("sweep-press-releases/"))).toBe(
+      false,
+    );
   });
 });

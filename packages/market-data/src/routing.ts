@@ -37,6 +37,8 @@ export function buildRoutingTable(prices: {
     earnings: { primary: "finnhub", fallback: null },
     institutional_holdings: { primary: "sec_edgar", fallback: null },
     short_interest: { primary: "finra", fallback: null },
+    // Company press releases come with the filings (SEC EDGAR); this is the news feed.
+    news: { primary: "finnhub", fallback: null },
   };
 }
 

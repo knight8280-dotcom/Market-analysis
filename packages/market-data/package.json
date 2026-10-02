@@ -18,7 +18,9 @@
     "./adapters/sec-ownership": "./src/adapters/sec-ownership.ts",
     "./xml": "./src/xml.ts",
     "./adapters/sec-datasets": "./src/adapters/sec-datasets.ts",
-    "./adapters/finra": "./src/adapters/finra.ts"
+    "./adapters/finra": "./src/adapters/finra.ts",
+    "./adapters/sec-press": "./src/adapters/sec-press.ts",
+    "./html-text": "./src/html-text.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

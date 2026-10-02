@@ -24,6 +24,12 @@ export interface ScheduleConfig {
   form13fAt: string;
   /** FINRA short interest (published twice a month, about a week after each settlement date). */
   shortInterestAt: string;
+  /** Finnhub company news: before the open and after the close. */
+  newsAt: readonly string[];
+  /** Press releases in 8-Ks the evening's filings refresh did not read (after edgarAt). */
+  pressReleasesAt: string;
+  /** News past its retention period is deleted. */
+  pruneNewsAt: string;
   /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
   screenerAt: string;
   /** Earnings and economic calendars, refreshed before the open. */
@@ -35,6 +41,7 @@ export interface ScheduleConfig {
   earningsEnabled: boolean;
   releasesEnabled: boolean;
   shortInterestEnabled: boolean;
+  newsEnabled: boolean;
   macroSeries: readonly string[];
 }
 
@@ -47,6 +54,9 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   insidersAt: "22:30",
   form13fAt: "23:00",
   shortInterestAt: "19:30",
+  newsAt: ["07:00", "17:00"],
+  pressReleasesAt: "22:45",
+  pruneNewsAt: "03:30",
   screenerAt: "18:45",
   calendarsAt: "06:30",
   alertsAt: "18:50",
@@ -55,6 +65,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   earningsEnabled: false,
   releasesEnabled: false,
   shortInterestEnabled: false,
+  newsEnabled: false,
   macroSeries: [],
 };
 
@@ -137,6 +148,27 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.form13fAt)) {
     jobs.push({ name: JOBS.schedule13f, data: {}, jobId: jobId(JOBS.schedule13f, today) });
+  }
+  if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.pressReleasesAt)) {
+    jobs.push({
+      name: JOBS.sweepPressReleases,
+      data: {},
+      jobId: jobId(JOBS.sweepPressReleases, today),
+    });
+  }
+  if (cfg.newsEnabled) {
+    // The latest slot that has started today; each runs once.
+    const slot = [...cfg.newsAt].reverse().find((at) => etMinutes >= minutesOfDay(at));
+    if (slot) {
+      jobs.push({
+        name: JOBS.ingestNews,
+        data: {},
+        jobId: jobId(JOBS.ingestNews, today, slot.replace(":", "")),
+      });
+    }
+  }
+  if (etMinutes >= minutesOfDay(cfg.pruneNewsAt)) {
+    jobs.push({ name: JOBS.pruneNews, data: {}, jobId: jobId(JOBS.pruneNews, today) });
   }
   return jobs;
 }

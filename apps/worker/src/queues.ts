@@ -8,6 +8,7 @@ export const QUEUES = {
   fundamentals: "ingest-fundamentals",
   filings: "ingest-filings",
   macro: "ingest-macro",
+  news: "ingest-news",
   maintenance: "maintenance",
   monitor: "monitor",
   deadLetter: "dead-letter",
@@ -39,6 +40,10 @@ export const JOBS = {
   ingestForm13f: "ingest-13f",
   schedule13f: "schedule-13f",
   ingestShortInterest: "ingest-short-interest",
+  ingestNews: "ingest-news",
+  ingestPressRelease: "ingest-press-release",
+  sweepPressReleases: "sweep-press-releases",
+  pruneNews: "prune-news",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -67,6 +72,10 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "ingest-13f": QUEUES.filings,
   "schedule-13f": QUEUES.filings,
   "ingest-short-interest": QUEUES.macro,
+  "ingest-news": QUEUES.news,
+  "ingest-press-release": QUEUES.filings,
+  "sweep-press-releases": QUEUES.filings,
+  "prune-news": QUEUES.maintenance,
 };
 
 /**
@@ -96,6 +105,8 @@ export const CONCURRENCY: Readonly<Record<QueueName, number>> = {
   "ingest-fundamentals": 2,
   "ingest-filings": 2,
   "ingest-macro": 1,
+  // One run at a time: a run asks for each company in turn within Finnhub's per-minute limit.
+  "ingest-news": 1,
   maintenance: 2,
   monitor: 1,
   "dead-letter": 1,

@@ -45,6 +45,8 @@ import { loadUniverse } from "./universe";
  *   cusips [--files 6]                   (CUSIPs from SEC's fails-to-deliver files)
  *   short-interest [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINRA_API_CLIENT_ID and _SECRET)
  *   13f [--latest 2] [--names 01jun2026-31aug2026_form13f.zip] [--force]   (about 100 MB each)
+ *   press-releases [--days 90] [--tickers AAPL,MSFT] [--limit 500]   (8-Ks already listed by `edgar`)
+ *   news [--tickers AAPL,MSFT] [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   screener
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
@@ -487,6 +489,59 @@ async function main(): Promise<void> {
         });
         break;
       }
+
+      case "press-releases": {
+        // Reads stored 8-Ks with exhibits that have not been read (two SEC requests each).
+        const tickers = list(flag("tickers"));
+        const ciks = tickers
+          ? (
+              await db
+                .selectFrom("market.securities")
+                .select("cik")
+                .where(
+                  "ticker",
+                  "in",
+                  tickers.map((t) => t.toUpperCase()),
+                )
+                .where("cik", "is not", null)
+                .execute()
+            ).map((r) => r.cik!)
+          : undefined;
+        if (tickers && !ciks?.length) throw new Error("None of those tickers has a CIK yet");
+        const sweep = await runJob(ctx, JOBS.sweepPressReleases, {
+          days: Number(flag("days") ?? 90),
+          ...(ciks ? { ciks } : {}),
+          ...(flag("limit") ? { limit: Number(flag("limit")) } : {}),
+        });
+        const jobs = await drain();
+        const checks = await db
+          .selectFrom("market.press_release_checks")
+          .select(["outcome", (eb) => eb.fn.countAll<string>().as("n")])
+          .where("checked_at", ">=", new Date(started))
+          .groupBy("outcome")
+          .execute();
+        const edgar = ctx.providers.get("sec_edgar");
+        print({
+          sweep,
+          jobs,
+          outcomes: Object.fromEntries(checks.map((c) => [c.outcome, Number(c.n)])),
+          failures,
+          httpStatusCounts:
+            edgar instanceof SecEdgarProvider ? Object.fromEntries(edgar.http.statusCounts) : {},
+          seconds: (Date.now() - started) / 1000,
+        });
+        break;
+      }
+
+      case "news":
+        print(
+          await runJob(ctx, JOBS.ingestNews, {
+            ...(list(flag("tickers")) ? { tickers: list(flag("tickers")) } : {}),
+            ...(flag("from") ? { from: flag("from") } : {}),
+            ...(flag("to") ? { to: flag("to") } : {}),
+          }),
+        );
+        break;
 
       case "short-interest":
         print(

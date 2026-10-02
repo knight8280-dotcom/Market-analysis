@@ -153,6 +153,9 @@ importers:
       '@market/market-data':
         specifier: workspace:*
         version: link:../../packages/market-data
+      '@market/news':
+        specifier: workspace:*
+        version: link:../../packages/news
       '@market/ownership':
         specifier: workspace:*
         version: link:../../packages/ownership
@@ -274,6 +277,8 @@ importers:
         version: 3.4.0
 
   packages/metrics: {}
+
+  packages/news: {}
 
   packages/ownership: {}
 

@@ -8,6 +8,7 @@ import type {
   FundamentalFact,
   MacroObservation,
   MacroSeries,
+  NewsItem,
   ProviderId,
   SecurityRecord,
 } from "./types";
@@ -16,6 +17,12 @@ import type {
 export interface DateRange {
   start: IsoDate;
   end: IsoDate;
+}
+
+/** News items, and the ones left out (never repaired or guessed at) with the reason. */
+export interface NewsPage {
+  items: NewsItem[];
+  skipped: { id: string; reason: string }[];
 }
 
 export interface SymbolRange extends DateRange {
@@ -43,6 +50,8 @@ export interface MarketDataProvider {
   getMacroObservations(req: { seriesId: string; start?: IsoDate }): Promise<MacroObservation[]>;
   /** Earnings dates, estimates and actuals between two dates (inclusive). */
   getEarningsCalendar(req: { from: IsoDate; to: IsoDate }): Promise<EarningsEvent[]>;
+  /** A company's news between two dates (inclusive), with any items left out and why. */
+  getNews(req: { symbol: string; from: IsoDate; to: IsoDate }): Promise<NewsPage>;
   /** Cheap request proving the vendor is reachable and our credentials work. */
   healthCheck(): Promise<void>;
 
@@ -50,7 +59,6 @@ export interface MarketDataProvider {
   getIntradayBars(req: unknown): Promise<never>;
   getQuoteSnapshot(req: unknown): Promise<never>;
   streamQuotes(req: unknown): AsyncIterable<never>;
-  getNews(req: unknown): Promise<never>;
   getInsiderTransactions(req: unknown): Promise<never>;
   getInstitutionalHoldings(req: unknown): Promise<never>;
   getOptionsChain(req: unknown): Promise<never>;
@@ -96,7 +104,7 @@ export abstract class BaseProvider implements MarketDataProvider {
   streamQuotes(_req: unknown): AsyncIterable<never> {
     throw new NotSupportedError(this.id, "streamQuotes");
   }
-  getNews(_req: unknown): Promise<never> {
+  getNews(_req: { symbol: string; from: IsoDate; to: IsoDate }): Promise<NewsPage> {
     return this.unsupported("getNews");
   }
   getEarningsCalendar(_req: { from: IsoDate; to: IsoDate }): Promise<EarningsEvent[]> {

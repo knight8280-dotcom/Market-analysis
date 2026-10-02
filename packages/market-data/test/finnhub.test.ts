@@ -41,6 +41,43 @@ describe("FinnhubProvider", () => {
     expect(calls[0]!.headers["x-finnhub-token"]).toBe("finnhub-key-for-tests-only");
   });
 
+  it("maps company news with provenance and leaves out what it cannot use", async () => {
+    const { p, calls } = provider({ "/api/v1/company-news": "finnhub/company-news.json" });
+    const { items, skipped } = await p.getNews({
+      symbol: "TEST_DIV",
+      from: "2026-09-01",
+      to: "2026-09-30",
+    });
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({
+      source: "finnhub",
+      source_symbol: "TEST_DIV",
+      fetched_at: new Date("2026-09-30T12:00:00Z"),
+      as_of: new Date("2026-09-30T08:00:00Z"),
+      license_tier: "personal_dev",
+      source_id: "9000001",
+      url: "https://news.example.invalid/2026/10/01/dividend?utm_source=finnhub",
+      headline: "TEST_DIV Example Corp raises its quarterly dividend",
+      described: false,
+      summary: "Example Corp said its board approved a higher dividend.",
+      publisher: "Example Wire",
+      category: "company",
+      published_at: new Date("2026-09-30T08:00:00Z"),
+      symbols: ["TEST_DIV"],
+    });
+    // An empty summary stays empty; every related symbol is kept.
+    expect(items[1]).toMatchObject({ summary: null, symbols: ["TEST_DIV", "TEST_SPLIT4"] });
+    expect(skipped.map((s) => s.id)).toEqual(["9000003", "9000004", "9000005"]);
+    expect(skipped[0]!.reason).toMatch(/^url:/);
+    expect(skipped[2]!.reason).toBe("publication time 0 is not plausible");
+    const url = new URL(calls[0]!.url);
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      symbol: "TEST_DIV",
+      from: "2026-09-01",
+      to: "2026-09-30",
+    });
+  });
+
   it("rejects a payload that does not match the documented shape", async () => {
     const { p } = provider({
       "/api/v1/calendar/earnings": { status: 200, body: JSON.stringify({ earnings: [] }) },
@@ -48,5 +85,11 @@ describe("FinnhubProvider", () => {
     await expect(p.getEarningsCalendar({ from: "2026-09-01", to: "2026-09-02" })).rejects.toThrow(
       ProviderResponseError,
     );
+    const news = provider({
+      "/api/v1/company-news": { status: 200, body: JSON.stringify({ articles: [] }) },
+    });
+    await expect(
+      news.p.getNews({ symbol: "TEST_DIV", from: "2026-09-01", to: "2026-09-02" }),
+    ).rejects.toThrow(ProviderResponseError);
   });
 });

@@ -170,19 +170,23 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
   },
   finnhub: {
     provider: "finnhub",
-    plan: "Free personal key: the owner's own use only. Commercial use needs Finnhub's written approval.",
+    plan: "Free personal key: the owner's own use only. A business may not use a personal plan, even internally, without Finnhub's written approval; data and results derived from it are not shared with anyone; data is deleted if the subscription ends (Finnhub Terms of Service).",
     status: "personal",
     licenseTier: "personal_dev",
     display: {
       audience: "owner",
       realtime: false,
       intradayDelayMinutes: null,
-      datasets: ["earnings"],
+      datasets: ["earnings", "news"],
     },
     exportAllowed: false,
-    attribution: { provider: "finnhub", text: "Earnings data: Finnhub", url: "https://finnhub.io" },
+    attribution: {
+      provider: "finnhub",
+      text: "Earnings calendar and news: Finnhub",
+      url: "https://finnhub.io",
+    },
     termsUrl: "https://finnhub.io/terms-of-service",
-    verifiedOn: null,
+    verifiedOn: "2026-10-02",
   },
   treasury: {
     provider: "treasury",

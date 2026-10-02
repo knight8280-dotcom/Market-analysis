@@ -1,7 +1,19 @@
-# Default gitleaks rules plus an allowlist for the committed placeholder file.
+# Default gitleaks rules plus an allowlist for the committed placeholder file, and one narrow
+# exception to the generic key rule.
 [extend]
 useDefault = true
 
 [allowlist]
 description = "Placeholder values only"
 paths = ['''\.env\.example$''']
+
+# SEC accession numbers are public filing IDs, but "accession" begins with "access", one of the
+# generic-api-key rule's keywords, so `accession_no: SOME_FILING` reads as a key. Only this rule
+# skips a match on an accession name; real keys (api_key, access_token, accessKey) still fail.
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "SEC accession numbers"
+  regexTarget = "match"
+  regexes = ['''(?i)accession''']

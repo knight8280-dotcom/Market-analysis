@@ -16,7 +16,8 @@
     "./sectors": "./src/sectors.ts",
     "./adapters/finnhub": "./src/adapters/finnhub.ts",
     "./adapters/sec-ownership": "./src/adapters/sec-ownership.ts",
-    "./xml": "./src/xml.ts"
+    "./xml": "./src/xml.ts",
+    "./adapters/sec-datasets": "./src/adapters/sec-datasets.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
@@ -27,6 +28,10 @@
   "dependencies": {
     "@market/calendar": "workspace:*",
     "ioredis": "6.0.0",
+    "yauzl": "3.4.0",
     "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/yauzl": "3.4.0"
   }
 }

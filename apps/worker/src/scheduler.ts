@@ -20,6 +20,8 @@ export interface ScheduleConfig {
   edgarAt: string;
   /** Form 4 documents the evening's filings refresh did not read (after edgarAt). */
   insidersAt: string;
+  /** A look at SEC's 13F data set listing (one request), reading any new data set. */
+  form13fAt: string;
   /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
   screenerAt: string;
   /** Earnings and economic calendars, refreshed before the open. */
@@ -40,6 +42,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   macroAt: "18:00",
   edgarAt: "21:00",
   insidersAt: "22:30",
+  form13fAt: "23:00",
   screenerAt: "18:45",
   calendarsAt: "06:30",
   alertsAt: "18:50",
@@ -119,6 +122,9 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.insidersAt)) {
     jobs.push({ name: JOBS.sweepInsiders, data: {}, jobId: jobId(JOBS.sweepInsiders, today) });
+  }
+  if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.form13fAt)) {
+    jobs.push({ name: JOBS.schedule13f, data: {}, jobId: jobId(JOBS.schedule13f, today) });
   }
   return jobs;
 }

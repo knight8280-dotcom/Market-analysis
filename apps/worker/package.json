@@ -19,6 +19,7 @@
     "@market/config": "workspace:*",
     "@market/db": "workspace:*",
     "@market/market-data": "workspace:*",
+    "@market/ownership": "workspace:*",
     "@market/screener": "workspace:*",
     "bullmq": "6.3.10",
     "ioredis": "6.0.0",

@@ -27,7 +27,7 @@ Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is
 | `packages/config`      | zod-validated env (`loadWorkerEnv`, `loadWebEnv`), secret redaction, production guards                                                                                                                                                                                                                                                                                                                                              |
 | `packages/db`          | Kysely client (`@market/db`), migration runner and schema fingerprint (`/migrations`), security audit (`/security`), test databases (`/testing`), generated types                                                                                                                                                                                                                                                                   |
 | `packages/calendar`    | NYSE/Nasdaq trading calendar: holidays, early closes, unscheduled closures, UTC sessions, DST                                                                                                                                                                                                                                                                                                                                       |
-| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine, statement builder, SEC report parser (ADR-020) and Form 4 parser with a strict XML reader (ADR-031)                                                                                                                                         |
+| `packages/market-data` | canonical types, `MarketDataProvider`, adapters (Tiingo, SEC EDGAR, FRED, synthetic), licenses, routing decisions, HttpClient, Redis rate limiter, validation rules, adjustment engine, statement builder, SEC report parser (ADR-020) Form 4 parser with a strict XML reader (ADR-031), and SEC bulk data set readers for 13F and fails-to-deliver files (ADR-032)                                                                 |
 | `packages/ui`          | design system: Tailwind tokens (dark, light, system themes; AA contrast), shadcn-style components on Radix, command palette, number and date formatting                                                                                                                                                                                                                                                                             |
 | `packages/indicators`  | pure TypeScript technical indicators (averages, RSI, MACD, bands, ATR, stochastic, ADX/DI, CCI, %R, OBV, VWAP, channels, volatility, relative strength) matching TA-Lib; null warm-ups                                                                                                                                                                                                                                              |
 | `packages/screener`    | screen JSON schema, SQL compiler that emits only whitelisted identifiers and binds every value, independent oracle, presets, snapshot math (ADR-021)                                                                                                                                                                                                                                                                                |
@@ -36,7 +36,7 @@ Status: Phase 1 complete (personal analytics app, ADR-015). The standing spec is
 | `packages/metrics`     | one definition of each series statistic: returns, volatility, Sharpe, Sortino, drawdown, CAGR, beta, correlation, correlation matrix, concentration (ADR-026)                                                                                                                                                                                                                                                                       |
 | `packages/valuation`   | two-stage DCF, sensitivity grid, multiples, peer median and percentile, figures as known on a date (ADR-027)                                                                                                                                                                                                                                                                                                                        |
 | `packages/backtest`    | strategy JSON schema, deterministic engine on point-in-time data, metrics, parameter sweeps, out-of-sample split, walk-forward, run requests, data fingerprint (ADR-025)                                                                                                                                                                                                                                                            |
-| `packages/ownership`   | Form 4 transaction-code legend in SEC's wording, insider roles, open-market purchase and sale totals, clusters of purchases by several insiders (descriptive; ADR-031)                                                                                                                                                                                                                                                              |
+| `packages/ownership`   | Form 4 transaction-code legend in SEC's wording, insider roles, open-market purchase and sale totals, clusters of purchases by several insiders (descriptive; ADR-031); CUSIP-to-listing matching by ticker and name (ADR-032)                                                                                                                                                                                                      |
 | `packages/compliance`  | compliance copy registry (§12), data labels (source, delay, as-of), SAMPLE DATA and stale-data banners, footer disclaimer                                                                                                                                                                                                                                                                                                           |
 | `apps/worker`          | job handlers, BullMQ runtime, scheduler, freshness SLOs, staleness monitor, alert delivery (Resend), backtest runner (worker thread), operator CLI                                                                                                                                                                                                                                                                                  |
 | `apps/web`             | Next.js app for the owner: login, Markets dashboard (eight widgets, arranged and saved per user), ticker pages (lazy-loaded Lightweight Charts, indicators in a Web Worker above 5, drawing tools; Financials and Valuation tabs), screener, watchlists (SSE), portfolio, backtests, calendar (.ics), heatmap, alerts (one page per alert), notifications (header bell), data health, settings; ⌘K search; server-side queries only |
@@ -92,6 +92,7 @@ Raw prints are never overwritten.
 - Every filing's copy of a fact is kept (unique on accession, taxonomy, concept, unit and period, `NULLS NOT DISTINCT`), so backtests can use point-in-time `filed_at`.
 - `filings` is keyed by `(accession_no, cik)`, because co-registrants share accession numbers.
 - `insider_filings` (one Form 4 or 4/A, with its reporting owners as JSON and its footnotes) and `insider_transactions` (its lines as filed) are keyed by the issuer's CIK, like facts: a Form 4 names its share class only in free text. Amendments sit beside the filings they amend and are never netted against them (ADR-031). `insider_filing_errors` remembers documents the parser refused, by parser version.
+- `security_cusips` ties CUSIPs from SEC's fails-to-deliver files to our listings. `form13f_data_sets`, `form13f_filings` and `form13f_holdings` (one filing's share rows in one of our securities, summed) keep 13F data as filed; `institutional_holdings` holds each filer's position per quarter end, rebuilt from them with restatements and new-holdings amendments applied (ADR-032).
 
 ## Data flow
 
@@ -112,32 +113,33 @@ Raw prints are never overwritten.
 
 ### Jobs and schedules
 
-| Queue                 | Jobs                                                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`                                      |
-| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                                                         |
-| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`, `ingest-insider` (one Form 4), `sweep-insiders` |
-| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                                                              |
-| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`                                                  |
-| `alerts-evaluate`     | `evaluate-alerts` (one at a time; queued as data arrives and at 18:50; ADR-028)                                   |
-| `monitor`             | `staleness-monitor`                                                                                               |
-| `backtest-run`        | `run-backtest` (one at a time, each in a worker thread; ADR-025)                                                  |
-| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                                                               |
+| Queue                 | Jobs                                                                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ingest-eod`          | `ingest-securities`, `schedule-eod` (fan-out), `ingest-eod`, `reconcile-eod`                                                                                      |
+| `ingest-fundamentals` | `ingest-fundamentals`, `build-statements`                                                                                                                         |
+| `ingest-filings`      | `ingest-filings`, `schedule-edgar` (fan-out), `attach-edgar-ids`, `ingest-insider` (one Form 4), `sweep-insiders`, `refresh-cusips`, `ingest-13f`, `schedule-13f` |
+| `ingest-macro`        | `ingest-macro`, `ingest-earnings`, `ingest-releases`                                                                                                              |
+| `maintenance`         | `recompute-adjustments`, `ensure-partitions`, `refresh-screener`                                                                                                  |
+| `alerts-evaluate`     | `evaluate-alerts` (one at a time; queued as data arrives and at 18:50; ADR-028)                                                                                   |
+| `monitor`             | `staleness-monitor`                                                                                                                                               |
+| `backtest-run`        | `run-backtest` (one at a time, each in a worker thread; ADR-025)                                                                                                  |
+| `dead-letter`         | jobs that exhausted retries or failed unrecoverably                                                                                                               |
 
 `dueJobs(now)` is a pure function of the market calendar:
 
-| When (exchange time)                                                    | Job                                                                  |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| every minute                                                            | staleness monitor                                                    |
-| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out                                                          |
-| 02:00                                                                   | reconcile                                                            |
-| 03:00                                                                   | partitions                                                           |
-| 06:30                                                                   | earnings (Finnhub key) and economic releases (FRED)                  |
-| 18:00                                                                   | macro                                                                |
-| 18:45                                                                   | screener snapshot (after the 18:30 EOD deadline)                     |
-| 18:50                                                                   | every alert evaluated again, with email                              |
-| 21:00                                                                   | EDGAR sweep (off-peak)                                               |
-| 22:30                                                                   | Form 4 sweep: documents the evening's refresh did not read (ADR-031) |
+| When (exchange time)                                                    | Job                                                                         |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| every minute                                                            | staleness monitor                                                           |
+| 30 minutes after each session's close, including 1:00 p.m. early closes | EOD fan-out                                                                 |
+| 02:00                                                                   | reconcile                                                                   |
+| 03:00                                                                   | partitions                                                                  |
+| 06:30                                                                   | earnings (Finnhub key) and economic releases (FRED)                         |
+| 18:00                                                                   | macro                                                                       |
+| 18:45                                                                   | screener snapshot (after the 18:30 EOD deadline)                            |
+| 18:50                                                                   | every alert evaluated again, with email                                     |
+| 21:00                                                                   | EDGAR sweep (off-peak)                                                      |
+| 22:30                                                                   | Form 4 sweep: documents the evening's refresh did not read (ADR-031)        |
+| 23:00                                                                   | 13F: one look at SEC's data set listing; any new data set is read (ADR-032) |
 
 Besides the calendar, a 3-second poll enqueues backtests the owner queued (`run-backtest/<run id>`) and fails runs left running long after their time limit.
 

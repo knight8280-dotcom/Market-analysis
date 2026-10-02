@@ -27,6 +27,7 @@ export const DATASETS = [
   "filings",
   "macro",
   "earnings",
+  "institutional_holdings",
 ] as const;
 export const Dataset = z.enum(DATASETS);
 export type Dataset = z.infer<typeof Dataset>;

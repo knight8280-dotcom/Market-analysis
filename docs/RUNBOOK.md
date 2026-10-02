@@ -197,6 +197,13 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **Unreadable filings** (no XML, or a document the parser refuses) are listed in `market.insider_filing_errors` with the reason and are not fetched again until the parser version changes (`INSIDER_PARSER_VERSION` in `apps/worker/src/jobs/insiders.ts`). After fixing the parser, raise the version and run the history command again: it reads them, and re-reads stored filings, at the new version.
 - A Form 4 about another company (for example one Goldman Sachs filed as a large holder elsewhere) is stored under that company's CIK and shown only there.
 
+## Institutional holdings (13F)
+
+- Needs EDGAR (as above). At 23:00 ET the worker checks SEC's 13F listing and reads the two newest data sets when either is new (about 100 MB each, roughly 25 seconds to read). Data sets cover three months of filing dates: the June–August set holds the 30 June quarter.
+- **On demand:** `pnpm worker 13f` (add `--latest 3` for one more quarter, `--names <file>` for a particular set, `--force` to read stored sets again). It first refreshes CUSIPs from SEC's fails-to-deliver files if they are more than a week old; `pnpm worker cusips` does only that.
+- **A listing with no 13F holders** has no CUSIP. Check the data-health page or `ops.data_quality_issues` for `cusip_name_mismatch`: SEC's files gave its ticker a name that does not agree with ours (GE is listed by SEC as "GE AEROSPACE"). Correcting the listing's name in `market.securities` and running `pnpm worker cusips` fixes it if the names then agree.
+- Eight quarter ends are kept; older ones are dropped when a newer data set is read.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

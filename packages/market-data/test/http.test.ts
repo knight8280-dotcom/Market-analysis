@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderError, ProviderResponseError, RateLimiterUnavailableError } from "../src/errors";
 import { HttpClient, type HttpClientOptions } from "../src/http";
@@ -173,5 +176,80 @@ describe("HttpClient", () => {
       RateLimiterUnavailableError,
     );
     expect(server.requests).toHaveLength(0);
+  });
+
+  it("posts a JSON body and parses the JSON answer", async () => {
+    const bodies: string[] = [];
+    server = await startServer((req, res) => {
+      let body = "";
+      req.on("data", (c: Buffer) => (body += c.toString()));
+      req.on("end", () => {
+        bodies.push(body);
+        json(res, 200, [{ n: 1 }]);
+      });
+    });
+    const { http } = client(server.host);
+    expect(
+      await http.postJson(
+        server.url("/q"),
+        { limit: 5 },
+        { headers: { authorization: "Bearer t" } },
+      ),
+    ).toEqual([{ n: 1 }]);
+    const req = server.requests[0]!;
+    expect(req.method).toBe("POST");
+    expect(req.headers["content-type"]).toBe("application/json");
+    expect(req.headers["authorization"]).toBe("Bearer t");
+    expect(bodies).toEqual(['{"limit":5}']);
+  });
+
+  it("downloads a file to disk and retries a failed attempt from the start", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "http-download-"));
+    try {
+      const payload = Buffer.alloc(200_000, 7);
+      server = await startServer((_req, res, n) => {
+        if (n === 1) {
+          json(res, 503, {});
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/zip" });
+        res.end(payload);
+      });
+      const { http, delays } = client(server.host);
+      const path = join(dir, "data.zip");
+      expect(await http.download(server.url("/f.zip"), path, { maxBytes: 1_000_000 })).toEqual({
+        bytes: 200_000,
+      });
+      expect(readFileSync(path).equals(payload)).toBe(true);
+      expect(delays).toHaveLength(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a download over its size limit, declared or not", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "http-download-"));
+    try {
+      server = await startServer((req, res) => {
+        if (req.url === "/declared.zip") {
+          res.writeHead(200, { "content-length": "5000" });
+          res.end(Buffer.alloc(5000));
+          return;
+        }
+        // Chunked: no content-length, so the limit is enforced while streaming.
+        res.writeHead(200, { "content-type": "application/zip" });
+        res.write(Buffer.alloc(3000));
+        res.end(Buffer.alloc(3000));
+      });
+      const { http } = client(server.host);
+      await expect(
+        http.download(server.url("/declared.zip"), join(dir, "a"), { maxBytes: 4000 }),
+      ).rejects.toThrow(/over the 4000-byte limit/);
+      await expect(
+        http.download(server.url("/chunked.zip"), join(dir, "b"), { maxBytes: 4000 }),
+      ).rejects.toThrow(/exceeded the 4000-byte limit/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

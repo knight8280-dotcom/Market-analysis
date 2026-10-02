@@ -115,7 +115,7 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
       audience: "public",
       realtime: false,
       intradayDelayMinutes: null,
-      datasets: ["fundamentals", "filings"],
+      datasets: ["fundamentals", "filings", "institutional_holdings"],
     },
     exportAllowed: true,
     attribution: {

@@ -206,6 +206,41 @@ export interface MarketFinancialStatements {
   statement: string;
 }
 
+export interface MarketForm13fDataSets {
+  filings: number;
+  holdings: number;
+  infotable_rows: Int8;
+  ingested_at: Timestamp;
+  name: string;
+  row_count_mismatches: Generated<string[]>;
+  url: string;
+  window_end: string;
+  window_start: string;
+}
+
+export interface MarketForm13fFilings {
+  accession_no: string;
+  amendment_type: string | null;
+  data_set: string;
+  filed_on: string;
+  filer_cik: string;
+  filer_name: string;
+  report_period: string;
+  report_type: string;
+  submission_type: string;
+  table_entry_total: number | null;
+  table_value_total: Numeric | null;
+}
+
+export interface MarketForm13fHoldings {
+  accession_no: string;
+  cusip: string;
+  rows: number;
+  security_id: Int8;
+  shares: Numeric;
+  value_usd: Numeric;
+}
+
 export interface MarketFundamentalsFacts {
   accession_no: string;
   cik: string;
@@ -286,6 +321,17 @@ export interface MarketInsiderTransactions {
   transaction_date: string;
   underlying_shares: Numeric | null;
   underlying_title: string | null;
+}
+
+export interface MarketInstitutionalHoldings {
+  accession_nos: string[];
+  filed_on: string;
+  filer_cik: string;
+  filer_name: string;
+  report_period: string;
+  security_id: Int8;
+  shares: Numeric;
+  value_usd: Numeric;
 }
 
 export interface MarketMacroObservations {
@@ -407,6 +453,20 @@ export interface MarketSecurities {
    * Current (or last) ticker; history lives in security_symbol_history.
    */
   ticker: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MarketSecurityCusips {
+  cusip: string;
+  /**
+   * The issue name in the fails-to-deliver file (SEC cuts it to 30 characters).
+   */
+  description: string;
+  first_seen: string;
+  last_seen: string;
+  security_id: Int8;
+  source: Generated<string>;
+  symbol: string;
   updated_at: Generated<Timestamp>;
 }
 
@@ -605,10 +665,14 @@ export interface DB {
   "market.economic_releases": MarketEconomicReleases;
   "market.filings": MarketFilings;
   "market.financial_statements": MarketFinancialStatements;
+  "market.form13f_data_sets": MarketForm13fDataSets;
+  "market.form13f_filings": MarketForm13fFilings;
+  "market.form13f_holdings": MarketForm13fHoldings;
   "market.fundamentals_facts": MarketFundamentalsFacts;
   "market.insider_filing_errors": MarketInsiderFilingErrors;
   "market.insider_filings": MarketInsiderFilings;
   "market.insider_transactions": MarketInsiderTransactions;
+  "market.institutional_holdings": MarketInstitutionalHoldings;
   "market.macro_observations": MarketMacroObservations;
   "market.macro_series": MarketMacroSeries;
   "market.prices_daily": MarketPricesDaily;
@@ -616,6 +680,7 @@ export interface DB {
   "market.provider_symbols": MarketProviderSymbols;
   "market.screener_snapshot": MarketScreenerSnapshot;
   "market.securities": MarketSecurities;
+  "market.security_cusips": MarketSecurityCusips;
   "market.security_symbol_history": MarketSecuritySymbolHistory;
   notifications: Notifications;
   "ops.alerts": OpsAlerts;

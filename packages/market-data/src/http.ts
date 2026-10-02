@@ -1,3 +1,6 @@
+import { createWriteStream } from "node:fs";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { ProviderError, ProviderResponseError } from "./errors";
 import type { ProviderId } from "./types";
 
@@ -136,6 +139,105 @@ export class HttpClient {
     input: string | URL,
     init: { headers?: Record<string, string>; accept?: string } = {},
   ): Promise<string> {
+    const response = await this.send(input, { method: "GET", ...init });
+    return await response.text();
+  }
+
+  /**
+   * POST with a JSON body (or none), for query APIs that take their filters in the body (FINRA).
+   * Retried like a GET, so use it only for requests that are safe to repeat.
+   */
+  async postJson(
+    input: string | URL,
+    body: unknown,
+    init: { headers?: Record<string, string> } = {},
+  ): Promise<unknown> {
+    const response = await this.send(input, {
+      method: "POST",
+      accept: "application/json",
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+        ...init.headers,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as unknown;
+    } catch (err) {
+      throw new ProviderResponseError(
+        this.provider,
+        `Response from ${this.redact(new URL(input))} is not valid JSON`,
+        err,
+      );
+    }
+  }
+
+  /**
+   * Streams a large file (an SEC bulk zip) to `path`, refusing anything over `maxBytes`. Same
+   * allowlist, limiter and redaction; a failure part-way through starts the file again.
+   */
+  async download(
+    input: string | URL,
+    path: string,
+    opts: { maxBytes: number; timeoutMs?: number },
+  ): Promise<{ bytes: number }> {
+    const url = new URL(input);
+    for (let attempt = 0; ; attempt += 1) {
+      const response = await this.send(url, { method: "GET" }, opts.timeoutMs);
+      const declared = Number(response.headers.get("content-length"));
+      if (Number.isFinite(declared) && declared > opts.maxBytes) {
+        await response.body?.cancel();
+        throw new ProviderError(
+          this.provider,
+          `${this.redact(url)} is ${declared} bytes, over the ${opts.maxBytes}-byte limit`,
+          { retryable: false },
+        );
+      }
+      let bytes = 0;
+      const limit = new Transform({
+        transform: (chunk: Buffer, _enc, done) => {
+          bytes += chunk.length;
+          if (bytes > opts.maxBytes) {
+            done(
+              new ProviderError(
+                this.provider,
+                `${this.redact(url)} exceeded the ${opts.maxBytes}-byte limit`,
+                { retryable: false },
+              ),
+            );
+          } else done(null, chunk);
+        },
+      });
+      try {
+        if (!response.body) throw new ProviderResponseError(this.provider, "Empty response body");
+        await pipeline(Readable.fromWeb(response.body), limit, createWriteStream(path));
+        return { bytes };
+      } catch (err) {
+        if (err instanceof ProviderError && !err.retryable) throw err;
+        if (attempt >= this.opts.maxRetries) {
+          throw new ProviderError(
+            this.provider,
+            `Download failed after ${attempt + 1} attempts: ${this.redact(url)}`,
+            { retryable: true, cause: err instanceof Error ? new Error(err.message) : undefined },
+          );
+        }
+        await this.opts.sleep(this.backoff(attempt, null));
+      }
+    }
+  }
+
+  /** One request with the allowlist, limiter, retries and redaction; returns a 2xx response. */
+  private async send(
+    input: string | URL,
+    init: {
+      method: "GET" | "POST";
+      headers?: Record<string, string>;
+      accept?: string;
+      body?: string;
+    },
+    timeoutMs = this.opts.timeoutMs,
+  ): Promise<Response> {
     const url = new URL(input);
     this.assertAllowed(url);
     const safeUrl = this.redact(url);
@@ -147,15 +249,16 @@ export class HttpClient {
       let response: Response;
       try {
         response = await this.opts.fetch(url, {
-          method: "GET",
+          method: init.method,
           redirect: "error",
-          signal: AbortSignal.timeout(this.opts.timeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
           headers: {
             accept: init.accept ?? "*/*",
             "accept-encoding": "gzip, deflate",
             ...this.opts.headers,
             ...init.headers,
           },
+          body: init.body,
         });
       } catch (err) {
         this.count(0);
@@ -187,7 +290,7 @@ export class HttpClient {
         attempt,
       });
 
-      if (response.ok) return await response.text();
+      if (response.ok) return response;
 
       // Drain the body so the connection can be reused.
       await response.body?.cancel();

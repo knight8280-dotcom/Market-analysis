@@ -35,6 +35,7 @@ export function buildRoutingTable(prices: {
     filings: { primary: "sec_edgar", fallback: null },
     macro: { primary: "fred", fallback: null },
     earnings: { primary: "finnhub", fallback: null },
+    institutional_holdings: { primary: "sec_edgar", fallback: null },
   };
 }
 

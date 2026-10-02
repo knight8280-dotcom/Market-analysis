@@ -35,6 +35,9 @@ export const JOBS = {
   runBacktest: "run-backtest",
   ingestInsider: "ingest-insider",
   sweepInsiders: "sweep-insiders",
+  refreshCusips: "refresh-cusips",
+  ingestForm13f: "ingest-13f",
+  schedule13f: "schedule-13f",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -59,6 +62,9 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "run-backtest": QUEUES.backtest,
   "ingest-insider": QUEUES.filings,
   "sweep-insiders": QUEUES.filings,
+  "refresh-cusips": QUEUES.filings,
+  "ingest-13f": QUEUES.filings,
+  "schedule-13f": QUEUES.filings,
 };
 
 /**

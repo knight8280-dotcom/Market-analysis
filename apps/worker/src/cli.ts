@@ -42,6 +42,8 @@ import { loadUniverse } from "./universe";
  *   statements [--ciks 320193,789019]   (default: every registrant with facts)
  *   check-statements [--ciks ...]        (default: 10 large filers; live SEC requests)
  *   insiders [--days 730] [--tickers AAPL,MSFT] [--limit 500]   (Form 4s already listed by `edgar`)
+ *   cusips [--files 6]                   (CUSIPs from SEC's fails-to-deliver files)
+ *   13f [--latest 2] [--names 01jun2026-31aug2026_form13f.zip] [--force]   (about 100 MB each)
  *   screener
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
@@ -478,6 +480,26 @@ async function main(): Promise<void> {
           filingsStored: Number(read?.n ?? 0),
           unreadable,
           failures,
+          httpStatusCounts:
+            edgar instanceof SecEdgarProvider ? Object.fromEntries(edgar.http.statusCounts) : {},
+          seconds: (Date.now() - started) / 1000,
+        });
+        break;
+      }
+
+      case "cusips":
+        print(await runJob(ctx, JOBS.refreshCusips, { files: Number(flag("files") ?? 6) }));
+        break;
+
+      case "13f": {
+        const result = await runJob(ctx, JOBS.ingestForm13f, {
+          ...(flag("latest") ? { latest: Number(flag("latest")) } : {}),
+          ...(flag("names") ? { names: list(flag("names")) } : {}),
+          force: process.argv.includes("--force"),
+        });
+        const edgar = ctx.providers.get("sec_edgar");
+        print({
+          ...(result as object),
           httpStatusCounts:
             edgar instanceof SecEdgarProvider ? Object.fromEntries(edgar.http.statusCounts) : {},
           seconds: (Date.now() - started) / 1000,

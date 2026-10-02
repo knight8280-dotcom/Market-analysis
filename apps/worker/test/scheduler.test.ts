@@ -60,6 +60,9 @@ describe("calendar-driven schedule", () => {
     // 22:30 EDT: Form 4 documents the evening's filings refresh did not read.
     expect(evening).not.toContain("sweep-insiders/2026-09-30");
     expect(ids("2026-10-01T02:30:00Z", cfg)).toContain("sweep-insiders/2026-09-30");
+    // 23:00 EDT: one look at SEC's 13F data set listing.
+    expect(ids("2026-10-01T02:30:00Z", cfg)).not.toContain("schedule-13f/2026-09-30");
+    expect(ids("2026-10-01T03:00:00Z", cfg)).toContain("schedule-13f/2026-09-30");
   });
 
   it("omits EDGAR and macro when not configured", () => {

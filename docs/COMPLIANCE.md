@@ -24,6 +24,8 @@ Informational, not legal advice. The owner consults a securities attorney before
 - What delay applies?
 - What does the exchange fee structure look like for delayed display (UTP external delayed redistributor fee)?
 
+**CUSIPs** (identifiers owned by CUSIP Global Services) come only from SEC's public files and are used only to join SEC's own data sets: never displayed, exported or sent anywhere (ADR-032).
+
 ## Spec rules and where they are enforced
 
 | Rule                                                                          | Enforcement                                                                                                                                                                                                                                                                                                                                                                                                                                     | Test                                                                                                          |

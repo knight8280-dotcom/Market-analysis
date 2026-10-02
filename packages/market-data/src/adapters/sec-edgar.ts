@@ -5,6 +5,7 @@ import { HttpClient, type HttpClientOptions, type RateLimiter } from "../http";
 import { BaseProvider } from "../provider";
 import { FilingRecord, FundamentalFact } from "../types";
 import { parseVendor } from "./common";
+import { dataSetLinks, SEC_LISTING_PAGES, type DataSetFile } from "./sec-datasets";
 
 /**
  * SEC EDGAR adapter (spec §2.3): company ticker map, submissions (filing metadata) and XBRL
@@ -315,6 +316,19 @@ export class SecEdgarProvider extends BaseProvider {
     }
     const folder = `${Number(padCik(req.cik))}/${req.accession.replaceAll("-", "")}`;
     return this.http.getText(`${this.wwwBase}/Archives/edgar/data/${folder}/${req.file}`);
+  }
+
+  /** Data set files linked from SEC's listing page (Form 13F data sets or fails-to-deliver). */
+  async listDataSets(kind: "form13f" | "ftd"): Promise<DataSetFile[]> {
+    const html = await this.http.getText(`${this.wwwBase}${SEC_LISTING_PAGES[kind]}`, {
+      accept: "text/html",
+    });
+    return dataSetLinks(html, kind, this.wwwBase);
+  }
+
+  /** Downloads one data set file to `path` (a 13F data set is about 100 MB). */
+  async downloadDataSet(file: DataSetFile, path: string): Promise<{ bytes: number }> {
+    return this.http.download(file.url, path, { maxBytes: 600_000_000, timeoutMs: 15 * 60_000 });
   }
 
   override async healthCheck(): Promise<void> {

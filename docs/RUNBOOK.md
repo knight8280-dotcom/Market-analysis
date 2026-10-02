@@ -230,6 +230,14 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **Changing the model or the prompt** (`SENTIMENT_PROMPT_VERSION` in `packages/ai/src/sentiment.ts`) rates the last 30 days again with the new one. A model without a price in `packages/ai/src/pricing.ts` is refused: add its price from Anthropic's pricing page first.
 - **Rejected answers** (a reply that is not JSON, or a label that contradicts its score) leave the story unrated; the next run asks again. Many rejections mean the model or prompt needs a look.
 
+## Installing the app
+
+- **On the computer:** open the app in Chrome or Edge (`http://localhost:3000`), then use the install icon at the right of the address bar (or the menu: "Install Market Analysis"). It opens in its own window; sign in there once. Uninstall from the app window's menu.
+- **On the phone:** needs the private HTTPS address from step J3 (Tailscale); this section will say how once that step is done.
+- **Offline:** if the device loses its connection, the page on screen stays, with a banner saying when it was loaded. Opening another page shows "You're offline": the app cannot be reached from this device (no connection, not on Tailscale, or the computer is off). Nothing from the app is kept on the device; "Try again" reloads once the connection is back.
+- **On a phone-sized screen** the navigation is a bar at the bottom; "More" holds the sections not in the bar.
+- **A page that looks out of date after an update:** reload it; the service worker updates itself on the next page load. To remove it entirely: the browser's site settings for the app's address, "Clear data" (or DevTools, Application, Service workers, Unregister).
+
 ## Ownership tab
 
 - A ticker's **Ownership** tab shows the three datasets above: Form 4 transactions from the last 12 months with 90-day purchase and sale totals and purchase clusters, 13F positions by quarter end (pick a quarter above the table) with changes from the quarter before, and short interest by settlement date. Every section names its source and date; each Form 4 line and 13F position links to its filing on SEC EDGAR.

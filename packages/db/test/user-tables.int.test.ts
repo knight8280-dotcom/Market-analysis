@@ -83,6 +83,11 @@ beforeAll(async () => {
     await t.pool.query(`insert into public.dashboard_layouts (user_id, layout) values ($1, '[]')`, [
       user,
     ]);
+    await t.pool.query(
+      `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth, device)
+       values ($1, $2, $3, $4, 'Chrome on Linux')`,
+      [user, `https://fcm.googleapis.com/fcm/send/${user}`, `B${"A".repeat(86)}`, "A".repeat(22)],
+    );
   }
 });
 afterAll(async () => {
@@ -111,6 +116,7 @@ describe("per-user tables", () => {
         "notifications",
         "chart_drawings",
         "dashboard_layouts",
+        "push_subscriptions",
       ]) {
         expect(await count(c, table), table).toBe(1);
       }

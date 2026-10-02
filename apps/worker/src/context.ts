@@ -2,6 +2,7 @@ import type { IsoDate } from "@market/calendar";
 import type { AnthropicClient } from "@market/ai";
 import type { AppEnv } from "@market/config";
 import type { Database } from "@market/db";
+import type { PushSender } from "@market/push";
 import type {
   Dataset,
   MarketDataProvider,
@@ -79,6 +80,8 @@ export interface AlertDelivery {
   dailyCap: number;
   /** Base of the links in alert emails (APP_BASE_URL); http://localhost:3000 when not set. */
   appUrl?: string;
+  /** Web Push to the owner's devices (WEB_PUSH_*); null when not configured. */
+  push?: PushSender | null;
 }
 
 export type DatasetKey = Dataset;

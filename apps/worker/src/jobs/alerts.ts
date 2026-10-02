@@ -23,6 +23,7 @@ import { OWNER_USER_ID, resolveFlags } from "@market/config";
 import { sql } from "@market/db";
 import { licenseFor, ProviderId } from "@market/market-data";
 import { ownersLabel, roleOf, type OwnerLike } from "@market/ownership";
+import { endpointLabel, sendPush } from "@market/push";
 import { Screen, screenMembers } from "@market/screener";
 import { z } from "zod";
 import type { WorkerContext } from "../context";
@@ -242,6 +243,7 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
             bar_date: result.date,
             event_key: result.key,
             message,
+            summary: body.slice(0, 4000),
             fired_at: now,
           })
           .onConflict((oc) => oc.columns(["alert_id", "event_key"]).doNothing())
@@ -278,10 +280,17 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
     counts.rows_inserted = outcome.fired;
 
     const delivery = await deliverPending(ctx, now, today);
-    counts.rows_updated = delivery.sent;
-    if (delivery.failed > 0) {
-      // Let the queue retry; firing is idempotent and delivery resumes where it stopped.
-      throw new Error(`${delivery.failed} alert email(s) failed: ${delivery.errors.join("; ")}`);
+    const push = await deliverPushPending(ctx, now, today);
+    counts.rows_updated = delivery.sent + push.sent;
+    // Let the queue retry; firing is idempotent and delivery resumes where it stopped. A push
+    // service that refuses a message is recorded, not retried by the queue: it would refuse
+    // again.
+    const failures = [
+      delivery.failed > 0 ? `${delivery.failed} alert email(s) failed` : null,
+      push.retry > 0 ? `${push.retry} push notification(s) to retry` : null,
+    ].filter(Boolean);
+    if (failures.length > 0) {
+      throw new Error(`${failures.join(", ")}: ${[...delivery.errors, ...push.errors].join("; ")}`);
     }
     await finishRun(ctx.db, runId, { status: "succeeded", counts, at: ctx.clock() });
     return {
@@ -292,6 +301,7 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
       evaluated: rows.rows.length,
       ...outcome,
       delivery,
+      push,
     };
   } catch (err) {
     await finishRun(ctx.db, runId, {
@@ -567,11 +577,13 @@ async function deliverPending(ctx: WorkerContext, now: Date, today: string) {
     event_id: string;
     user_id: string;
     message: string;
+    channels: string[];
   }>`
-    select event_id::text, user_id::text, message from public.alert_events
-    where delivery_status = 'pending'
-       or (delivery_status = 'failed' and fired_at > ${now}::timestamptz - interval '1 day')
-    order by fired_at, event_id
+    select e.event_id::text, e.user_id::text, e.message, a.channels
+    from public.alert_events e join public.alerts a on a.alert_id = e.alert_id
+    where e.delivery_status = 'pending'
+       or (e.delivery_status = 'failed' and e.fired_at > ${now}::timestamptz - interval '1 day')
+    order by e.fired_at, e.event_id
   `.execute(ctx.db);
   const result = { sent: 0, suppressed: 0, failed: 0, errors: [] as string[] };
   const mark = (eventId: string, status: "sent" | "failed" | "suppressed", error: string | null) =>
@@ -582,6 +594,11 @@ async function deliverPending(ctx: WorkerContext, now: Date, today: string) {
       .execute();
 
   for (const e of pending.rows) {
+    if (!e.channels.includes("email")) {
+      await mark(e.event_id, "suppressed", "email not chosen for this alert");
+      result.suppressed++;
+      continue;
+    }
     // Personal use: the only recipient is the owner's own address.
     if (e.user_id !== OWNER_USER_ID) {
       await mark(e.event_id, "suppressed", "emails go only to the owner");
@@ -620,6 +637,149 @@ async function deliverPending(ctx: WorkerContext, now: Date, today: string) {
       result.failed++;
       result.errors.push(message);
       ctx.log.warn({ eventId: e.event_id, err: message }, "alert email failed");
+    }
+  }
+  return result;
+}
+
+/** How long a push service keeps an alert for a device that is off: a day. */
+const PUSH_TTL_SECONDS = 24 * 3600;
+
+/**
+ * Push notifications for fired alerts (Phase 2 step J2, ADR-038), to every device the owner
+ * turned push on for. An event counts as pushed when at least one device took it. Devices the
+ * push service no longer knows are removed; the others keep their latest error for the
+ * settings page.
+ */
+async function deliverPushPending(ctx: WorkerContext, now: Date, today: string) {
+  const d = ctx.alertDelivery;
+  const sender = d?.push ?? null;
+  const pending = await sql<{
+    event_id: string;
+    user_id: string;
+    alert_id: string;
+    message: string;
+    summary: string | null;
+    channels: string[];
+  }>`
+    select e.event_id::text, e.user_id::text, e.alert_id::text, e.message, e.summary, a.channels
+    from public.alert_events e join public.alerts a on a.alert_id = e.alert_id
+    where e.push_status = 'pending'
+       or (e.push_status = 'failed' and e.fired_at > ${now}::timestamptz - interval '1 day')
+    order by e.fired_at, e.event_id
+  `.execute(ctx.db);
+  const result = {
+    sent: 0,
+    suppressed: 0,
+    failed: 0,
+    retry: 0,
+    removed: 0,
+    errors: [] as string[],
+  };
+  const mark = (eventId: string, status: "sent" | "failed" | "suppressed", error: string | null) =>
+    ctx.db
+      .updateTable("alert_events")
+      .set({
+        push_status: status,
+        push_error: error?.slice(0, 500) ?? null,
+        push_sent_at: status === "sent" ? now : null,
+      })
+      .where("event_id", "=", eventId)
+      .execute();
+  const suppress = async (eventId: string, why: string) => {
+    await mark(eventId, "suppressed", why);
+    result.suppressed++;
+  };
+
+  for (const e of pending.rows) {
+    if (!e.channels.includes("push")) {
+      await suppress(e.event_id, "push not chosen for this alert");
+      continue;
+    }
+    if (e.user_id !== OWNER_USER_ID) {
+      await suppress(e.event_id, "push notifications go only to the owner");
+      continue;
+    }
+    if (!d || !sender) {
+      await suppress(
+        e.event_id,
+        "push not configured (WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY, WEB_PUSH_CONTACT)",
+      );
+      continue;
+    }
+    const devices = await ctx.db
+      .selectFrom("push_subscriptions")
+      .select(["subscription_id", "endpoint", "p256dh", "auth", "device"])
+      .where("user_id", "=", e.user_id)
+      .orderBy("subscription_id")
+      .execute();
+    if (devices.length === 0) {
+      await suppress(e.event_id, "no device has push notifications turned on");
+      continue;
+    }
+    const sentToday = await sql<{ n: number }>`
+      select count(*)::int as n from public.alert_events
+      where user_id = ${e.user_id} and push_status = 'sent'
+        and (push_sent_at at time zone 'America/New_York')::date = ${today}::date
+    `.execute(ctx.db);
+    if ((sentToday.rows[0]?.n ?? 0) >= d.dailyCap) {
+      await suppress(e.event_id, `daily cap of ${d.dailyCap} push notifications reached`);
+      continue;
+    }
+
+    const [title = "Market Analysis alert"] = e.message.split("\n\n");
+    const payload = {
+      v: 1,
+      title: title.slice(0, 120),
+      body: (e.summary ?? "").slice(0, 400),
+      url: `/alerts/${e.alert_id}`,
+      tag: `alert-${e.alert_id}`,
+      alertId: Number(e.alert_id),
+      eventId: Number(e.event_id),
+    };
+    let delivered = 0;
+    let retry = false;
+    const problems: string[] = [];
+    for (const device of devices) {
+      const sent = await sendPush(
+        device,
+        { payload, ttlSeconds: PUSH_TTL_SECONDS, topic: `alert-${e.alert_id}`, now },
+        sender,
+      );
+      const row = ctx.db
+        .updateTable("push_subscriptions")
+        .where("subscription_id", "=", device.subscription_id);
+      if (sent.outcome === "sent") {
+        delivered++;
+        await row.set({ last_sent_at: now, failures: 0, last_error: null }).execute();
+      } else if (sent.outcome === "gone") {
+        // The browser unsubscribed or its subscription expired.
+        await ctx.db
+          .deleteFrom("push_subscriptions")
+          .where("subscription_id", "=", device.subscription_id)
+          .execute();
+        result.removed++;
+      } else {
+        const why = `${sent.status ?? "no answer"} ${sent.detail}`.trim().slice(0, 300);
+        problems.push(`${device.device}: ${why}`);
+        retry ||= sent.outcome === "retry";
+        await row.set((eb) => ({ failures: eb("failures", "+", 1), last_error: why })).execute();
+        ctx.log.warn(
+          { eventId: e.event_id, service: endpointLabel(device.endpoint), outcome: sent.outcome },
+          "push notification not delivered",
+        );
+      }
+    }
+    if (delivered > 0) {
+      await mark(e.event_id, "sent", problems.length > 0 ? problems.join("; ") : null);
+      result.sent++;
+    } else if (problems.length === 0) {
+      await suppress(e.event_id, "no device has push notifications turned on");
+    } else {
+      await mark(e.event_id, "failed", problems.join("; "));
+      result.failed++;
+      if (retry) result.retry++;
+      result.errors.push(...problems);
     }
   }
   return result;

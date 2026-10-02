@@ -25,7 +25,8 @@
     "worker": "pnpm --filter @market/worker run cli",
     "test:acceptance": "turbo run test:acceptance --concurrency=1",
     "web": "pnpm --filter @market/web dev",
-    "web:hash-password": "pnpm --filter @market/web run hash-password"
+    "web:hash-password": "pnpm --filter @market/web run hash-password",
+    "push:keys": "pnpm --filter @market/push run keys"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -162,6 +162,9 @@ importers:
       '@market/ownership':
         specifier: workspace:*
         version: link:../../packages/ownership
+      '@market/push':
+        specifier: workspace:*
+        version: link:../../packages/push
       '@market/screener':
         specifier: workspace:*
         version: link:../../packages/screener
@@ -299,6 +302,8 @@ importers:
       zod:
         specifier: 4.6.5
         version: 4.6.5
+
+  packages/push: {}
 
   packages/screener:
     dependencies:

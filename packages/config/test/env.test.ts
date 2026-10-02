@@ -206,3 +206,59 @@ describe("redactSecrets", () => {
     expect(redactSecrets("nothing here", worker)).toBe("nothing here");
   });
 });
+
+describe("Web Push settings", () => {
+  const web = {
+    APP_ENV: "local",
+    DATABASE_URL: "postgres://app:db-password-123@localhost:5432/market",
+    OWNER_PASSWORD_HASH: `scrypt:17:8:1:${"s".repeat(22)}:${"h".repeat(43)}`,
+    SESSION_SECRET: "x".repeat(32),
+  };
+  const push = {
+    WEB_PUSH_PUBLIC_KEY: `B${"p".repeat(86)}`,
+    WEB_PUSH_PRIVATE_KEY: "k".repeat(43),
+    WEB_PUSH_CONTACT: "mailto:owner@example.invalid",
+  };
+
+  it("takes all three or none, in the worker and the web app", () => {
+    expect(loadWorkerEnv(worker).WEB_PUSH_PUBLIC_KEY).toBeUndefined();
+    expect(loadWorkerEnv({ ...worker, ...push }).WEB_PUSH_CONTACT).toBe(push.WEB_PUSH_CONTACT);
+    expect(loadWebEnv({ ...web, ...push }).WEB_PUSH_PUBLIC_KEY).toBe(push.WEB_PUSH_PUBLIC_KEY);
+    for (const load of [loadWorkerEnv, loadWebEnv]) {
+      const base = load === loadWorkerEnv ? worker : web;
+      const problems = problemsOf(() => load({ ...base, ...push, WEB_PUSH_CONTACT: undefined }));
+      expect(problems).toEqual([
+        "WEB_PUSH_CONTACT WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY and WEB_PUSH_CONTACT go together",
+      ]);
+    }
+  });
+
+  it("checks the keys' form and the contact, never repeating the private key", () => {
+    const problems = problemsOf(() =>
+      loadWebEnv({
+        ...web,
+        WEB_PUSH_PUBLIC_KEY: "not-a-key",
+        WEB_PUSH_PRIVATE_KEY: "short-private-key-value",
+        WEB_PUSH_CONTACT: "owner@example.invalid",
+      }),
+    );
+    expect(problems).toHaveLength(3);
+    expect(problems.join("\n")).not.toContain("short-private-key-value");
+    expect(
+      loadWebEnv({ ...web, ...push, WEB_PUSH_CONTACT: "https://example.invalid/contact" })
+        .WEB_PUSH_CONTACT,
+    ).toBe("https://example.invalid/contact");
+  });
+
+  it("lets a stand-in push service on 127.0.0.1 in only for tests", () => {
+    expect(loadWebEnv({ ...web, APP_ENV: "test", WEB_PUSH_ALLOW_LOOPBACK: "true" })).toMatchObject({
+      WEB_PUSH_ALLOW_LOOPBACK: true,
+    });
+    expect(loadWorkerEnv(worker).WEB_PUSH_ALLOW_LOOPBACK).toBe(false);
+    for (const appEnv of ["local", "production"]) {
+      expect(
+        problemsOf(() => loadWebEnv({ ...web, APP_ENV: appEnv, WEB_PUSH_ALLOW_LOOPBACK: "true" })),
+      ).toEqual(["WEB_PUSH_ALLOW_LOOPBACK is only allowed when APP_ENV=test"]);
+    }
+  });
+});

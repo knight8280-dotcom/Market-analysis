@@ -1,5 +1,6 @@
 import type { WorkerEnv } from "@market/config";
 import type { AlertDelivery } from "./context";
+import { pushSenderFromEnv } from "./push";
 
 /** Outgoing alert email (Phase 1 step I3). Plain text: no tracking pixels, no remote content. */
 export interface OutgoingEmail {
@@ -99,5 +100,6 @@ export function alertDeliveryFromEnv(env: WorkerEnv): AlertDelivery {
     from: env.ALERT_EMAIL_FROM,
     dailyCap: env.ALERT_DAILY_CAP,
     appUrl: env.APP_BASE_URL,
+    push: pushSenderFromEnv(env),
   };
 }

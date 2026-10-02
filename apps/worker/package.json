@@ -22,6 +22,7 @@
     "@market/market-data": "workspace:*",
     "@market/news": "workspace:*",
     "@market/ownership": "workspace:*",
+    "@market/push": "workspace:*",
     "@market/screener": "workspace:*",
     "bullmq": "6.3.10",
     "ioredis": "6.0.0",

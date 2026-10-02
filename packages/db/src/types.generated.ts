@@ -40,12 +40,17 @@ export interface AlertEvents {
   event_key: string;
   fired_at: Generated<Timestamp>;
   message: string;
+  push_error: string | null;
+  push_sent_at: Timestamp | null;
+  push_status: Generated<string>;
+  summary: string | null;
   user_id: string;
 }
 
 export interface Alerts {
   active: Generated<boolean>;
   alert_id: Generated<Int8>;
+  channels: Generated<string[]>;
   cooldown_hours: Generated<number>;
   created_at: Generated<Timestamp>;
   kind: string;
@@ -669,6 +674,19 @@ export interface Portfolios {
   user_id: string;
 }
 
+export interface PushSubscriptions {
+  auth: string;
+  created_at: Generated<Timestamp>;
+  device: string;
+  endpoint: string;
+  failures: Generated<number>;
+  last_error: string | null;
+  last_sent_at: Timestamp | null;
+  p256dh: string;
+  subscription_id: Generated<Int8>;
+  user_id: string;
+}
+
 export interface SavedScreens {
   created_at: Generated<Timestamp>;
   definition: Json;
@@ -776,6 +794,7 @@ export interface DB {
   "ops.feature_flags": OpsFeatureFlags;
   "ops.provider_health": OpsProviderHealth;
   portfolios: Portfolios;
+  push_subscriptions: PushSubscriptions;
   saved_screens: SavedScreens;
   strategies: Strategies;
   transactions: Transactions;

@@ -3,7 +3,7 @@
 This file is the project's standing specification: Part B ("Master Build Prompt") of the original build brief, reproduced verbatim below. Phase instructions arrive separately. **Phase instructions govern scope; this document governs rules.**
 
 - Full original brief (licensing research, variables, phase prompts, checklists, provider comparison, risk register, sources): [`docs/BRIEF.md`](docs/BRIEF.md)
-- Current phase: **Phase 1 (personal use) complete (2026-09-30), 8/8 acceptance criteria met.** Report: [`docs/plans/PHASE_1_REPORT.md`](docs/plans/PHASE_1_REPORT.md). Phase 0: [`docs/plans/PHASE_0_REPORT.md`](docs/plans/PHASE_0_REPORT.md). **Phase 2: plan drafted, awaiting approval:** [`docs/plans/PHASE_2_PLAN.md`](docs/plans/PHASE_2_PLAN.md).
+- Current phase: **Phase 1 (personal use) complete (2026-09-30), 8/8 acceptance criteria met.** Report: [`docs/plans/PHASE_1_REPORT.md`](docs/plans/PHASE_1_REPORT.md). Phase 0: [`docs/plans/PHASE_0_REPORT.md`](docs/plans/PHASE_0_REPORT.md). **Phase 2 (personal use) approved 2026-10-02, in progress (2a first):** [`docs/plans/PHASE_2_PLAN.md`](docs/plans/PHASE_2_PLAN.md); push notifications on mobile and desktop.
 - Project docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md), [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/RUNBOOK.md`](docs/RUNBOOK.md), [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 
 ## Resolved variables (Part A)
@@ -27,7 +27,7 @@ Placeholders in the spec below resolve to these values. Update this table when a
 | [AUTH] | single-owner access; Supabase Auth only if deployed to the cloud | Phase 1 plan |
 | [BILLING] | none (personal use) | Decided 2026-09-30 |
 | [EMAIL_PROVIDER] | Resend, alerts to the owner only | Phase 1 plan |
-| [LLM_PROVIDER] | Any frontier LLM with tool/function calling | Open (Phase 2) |
+| [LLM_PROVIDER] | Anthropic API with the owner's own key, monthly cap `AI_MONTHLY_BUDGET_USD` (default $10) | Decided 2026-10-02 |
 | [TIERS] | none (personal use) | Decided 2026-09-30 |
 | [BROKER_LINKING] | Off until Phase 3; SnapTrade read-only | Default |
 | [JURISDICTIONS] | n/a (personal use) | Decided 2026-09-30 |

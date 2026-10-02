@@ -66,6 +66,12 @@ Research behind these rows: `docs/BRIEF.md`.
 - **Company news** (`/api/v1/company-news?symbol=&from=&to=`, ADR-035): North American companies, about a year back. We store the headline, summary, outlet, link and time as given, never the article itself, and keep them 400 days.
 - **Adapter status: SHAPE UNVERIFIED** (earnings checked against the documentation 2026-09-30, company news 2026-10-02). Fixtures hold made-up values; never commit Finnhub responses. Verify both endpoints when the key is created and record the date here.
 
+### Anthropic (AI, not a data source)
+
+- **What it is for:** model-estimated news sentiment now (ADR-036), questions about our own data in step K. It never supplies market data: every number shown comes from the sources above.
+- **Plan:** the owner's own API key (`ANTHROPIC_API_KEY`), paid by use, capped by `AI_MONTHLY_BUDGET_USD`. Prices read 2026-10-02 from https://platform.claude.com/docs/en/about-claude/pricing (Claude Haiku 4.5: $1 per million input tokens, $5 per million output tokens) and kept in `packages/ai/src/pricing.ts`; check them again when changing models.
+- **What is sent:** the headline, summary and tickers of each story to be rated, nothing about the owner.
+
 ### FINRA (short interest)
 
 - **Plan:** FINRA's Query API with a free "Public" credential, created by the owner in FINRA's API Console with an individual account (runbook). Dataset `otcMarket/consolidatedShortInterest`: every exchange-listed and OTC equity since June 2021, twice a month.

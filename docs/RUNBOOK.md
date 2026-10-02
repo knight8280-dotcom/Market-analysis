@@ -222,6 +222,14 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - News older than about 13 months is deleted at 03:30 ET. **If you give up the Finnhub key,** Finnhub's terms ask for its data to be deleted: `delete from market.news_articles where source = 'finnhub'; delete from market.earnings_events where source = 'finnhub';`.
 - "News" can be switched off on `/settings`; the data stays stored and is still read.
 
+## AI: news sentiment
+
+- **Key (optional, owner's own):** create an API key in the Claude Console (platform.claude.com) and set `ANTHROPIC_API_KEY` in `.env`. `AI_MONTHLY_BUDGET_USD` (default 10) caps spending per calendar month (UTC); `AI_SENTIMENT_MODEL` defaults to Claude Haiku 4.5, the least expensive model.
+- With the key, the worker rates new stories at 07:30, 17:30 and 23:30 ET; `pnpm worker sentiment` does it now (`--days 30`, `--limit 200`) and prints what it rated, rejected and spent. Expect a few cents a month.
+- **Spending:** every request is in `ops.ai_requests` with its tokens and cost (kept 90 days). This month so far: `select sum(cost_usd) from ops.ai_requests where created_at >= date_trunc('month', now() at time zone 'utc');`. When a request could pass the monthly cap, nothing more is sent until next month and the run says `stoppedBy: "budget"`; raise `AI_MONTHLY_BUDGET_USD` if you want more.
+- **Changing the model or the prompt** (`SENTIMENT_PROMPT_VERSION` in `packages/ai/src/sentiment.ts`) rates the last 30 days again with the new one. A model without a price in `packages/ai/src/pricing.ts` is refused: add its price from Anthropic's pricing page first.
+- **Rejected answers** (a reply that is not JSON, or a label that contradicts its score) leave the story unrated; the next run asks again. Many rejections mean the model or prompt needs a look.
+
 ## Ownership tab
 
 - A ticker's **Ownership** tab shows the three datasets above: Form 4 transactions from the last 12 months with 90-day purchase and sale totals and purchase clusters, 13F positions by quarter end (pick a quarter above the table) with changes from the quarter before, and short interest by settlement date. Every section names its source and date; each Form 4 line and 13F position links to its filing on SEC EDGAR.

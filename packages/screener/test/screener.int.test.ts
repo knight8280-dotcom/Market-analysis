@@ -9,6 +9,7 @@ import {
   parseScreen,
   PRESETS,
   runScreen,
+  screenMembers,
   type FieldId,
   type Screen,
   type SnapshotRow,
@@ -180,6 +181,27 @@ describe("SQL compiler vs oracle", () => {
         p.id,
       ).toEqual(expected.slice(0, 50).map((r) => r.ticker));
     }
+  });
+
+  it("lists every member of a screen for alerts, cut at the limit", async () => {
+    for (let i = 0; i < 40; i += 1) {
+      const screen = randomScreen();
+      const expected = evaluateScreen(ROWS, screen)
+        .map((r) => String(r.ticker))
+        .sort();
+      const { members, truncated, asOf } = await screenMembers(t.db, screen);
+      expect(
+        members.map((m) => m.ticker),
+        JSON.stringify(screen),
+      ).toEqual(expected);
+      expect(truncated).toBe(false);
+      expect(asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+    const all = await screenMembers(t.db, parseScreen({}), 100);
+    expect(all.members).toHaveLength(100);
+    expect(all.members[0]?.ticker).toBe("TEST_S0000");
+    expect(all.members[0]?.securityId).toMatch(/^\d+$/);
+    expect(all.truncated).toBe(true);
   });
 
   it("pages through results", async () => {

@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@market/indicators": "workspace:*",
     "zod": "4.6.5"
   }
 }

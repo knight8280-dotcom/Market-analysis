@@ -100,3 +100,37 @@ export async function runScreen(
   ]);
   return { rows: rows.rows, total: Number(total.rows[0]?.n ?? 0) };
 }
+
+export interface ScreenMembers {
+  /** Matching securities, by ticker. */
+  members: { securityId: string; ticker: string }[];
+  /** The latest session in the snapshot; null when the snapshot is empty. */
+  asOf: string | null;
+  /** True when more than `max` securities matched and the list was cut. */
+  truncated: boolean;
+}
+
+/** Every security a screen matches, without paging (alerts on a screen's results, step E1). */
+export async function screenMembers(
+  db: Database,
+  screen: Screen,
+  max = 5000,
+): Promise<ScreenMembers> {
+  const [rows, latest] = await Promise.all([
+    sql<{ security_id: string; ticker: string }>`
+      select security_id::text as security_id, ticker
+      from market.screener_snapshot
+      where ${where(screen)}
+      order by ticker, security_id
+      limit ${max + 1}
+    `.execute(db),
+    sql<{ as_of: string | null }>`
+      select max(as_of)::text as as_of from market.screener_snapshot
+    `.execute(db),
+  ]);
+  return {
+    members: rows.rows.slice(0, max).map((r) => ({ securityId: r.security_id, ticker: r.ticker })),
+    asOf: latest.rows[0]?.as_of ?? null,
+    truncated: rows.rows.length > max,
+  };
+}

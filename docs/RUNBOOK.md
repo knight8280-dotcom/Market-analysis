@@ -204,6 +204,13 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **A listing with no 13F holders** has no CUSIP. Check the data-health page or `ops.data_quality_issues` for `cusip_name_mismatch`: SEC's files gave its ticker a name that does not agree with ours (GE is listed by SEC as "GE AEROSPACE"). Correcting the listing's name in `market.securities` and running `pnpm worker cusips` fixes it if the names then agree.
 - Eight quarter ends are kept; older ones are dropped when a newer data set is read.
 
+## Short interest (FINRA)
+
+- **Credential (free, once):** on developer.finra.org choose Console, then "Create Account Here" to open an individual API account. In the API Console request a **Public** credential and accept FINRA's API Terms of Service; FINRA emails a link to set the client secret (it expires in 24 hours). Put the client ID and secret in `.env` as `FINRA_API_CLIENT_ID` and `FINRA_API_CLIENT_SECRET`. Personal, non-commercial use only.
+- **First run:** `pnpm worker short-interest` reads about a year of settlement dates for your listings and prints what it stored and any ticker whose FINRA name does not agree with yours. Then the worker checks daily at 19:30 ET (FINRA publishes about a week after each mid-month and month-end settlement date).
+- **First live run checks the adapter:** the token exchange and query format follow FINRA's documentation and have not yet been tried with a real credential. If the run fails with a response-shape or HTTP 400 error, keep the output (it names the field or status, never the secret) and fix the adapter (`packages/market-data/src/adapters/finra.ts`). Do not commit FINRA responses.
+- Days to cover is FINRA's own figure (short interest ÷ average daily volume). It is left empty when average volume is zero, where FINRA prints 999.99.
+
 ## Financial statements
 
 - Built automatically after each companyfacts load (`build-statements` job). To rebuild by hand: `pnpm worker statements` (all registrants, a few seconds for 50) or `--ciks 320193,789019`.

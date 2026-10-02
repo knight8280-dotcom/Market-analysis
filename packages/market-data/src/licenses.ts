@@ -147,6 +147,27 @@ export const DATA_LICENSES: Readonly<Record<ProviderId, DataLicense>> = {
     termsUrl: "https://fred.stlouisfed.org/docs/api/terms_of_use.html",
     verifiedOn: "2026-09-30",
   },
+  finra: {
+    provider: "finra",
+    plan: "FINRA Query API with a free Public credential: non-commercial personal or professional use only (FINRA API Terms of Service; Specific Terms for Equity Data).",
+    status: "personal",
+    licenseTier: "personal_dev",
+    display: {
+      audience: "owner",
+      realtime: false,
+      intradayDelayMinutes: null,
+      datasets: ["short_interest"],
+    },
+    exportAllowed: false,
+    attribution: {
+      provider: "finra",
+      // The Specific Terms for Equity Data require naming FINRA as the data's owner and source.
+      text: "Short interest: FINRA, the owner and source of this data",
+      url: "https://www.finra.org/finra-data/browse-catalog/equity-short-interest",
+    },
+    termsUrl: "https://developer.finra.org/finra-api-terms-service",
+    verifiedOn: "2026-10-02",
+  },
   finnhub: {
     provider: "finnhub",
     plan: "Free personal key: the owner's own use only. Commercial use needs Finnhub's written approval.",

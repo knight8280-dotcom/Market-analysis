@@ -65,6 +65,15 @@ describe("calendar-driven schedule", () => {
     expect(ids("2026-10-01T03:00:00Z", cfg)).toContain("schedule-13f/2026-09-30");
   });
 
+  it("checks FINRA short interest at 19:30 only when its credential is set", () => {
+    const on = { ...DEFAULT_SCHEDULE, shortInterestEnabled: true };
+    expect(ids("2026-09-30T23:29:00Z", on)).not.toContain("ingest-short-interest/2026-09-30");
+    expect(ids("2026-09-30T23:30:00Z", on)).toContain("ingest-short-interest/2026-09-30");
+    expect(ids("2026-09-30T23:30:00Z").some((id) => id.startsWith("ingest-short-interest/"))).toBe(
+      false,
+    );
+  });
+
   it("omits EDGAR and macro when not configured", () => {
     const evening = ids("2026-10-01T01:00:00Z");
     expect(

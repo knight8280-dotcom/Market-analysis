@@ -22,6 +22,8 @@ export interface ScheduleConfig {
   insidersAt: string;
   /** A look at SEC's 13F data set listing (one request), reading any new data set. */
   form13fAt: string;
+  /** FINRA short interest (published twice a month, about a week after each settlement date). */
+  shortInterestAt: string;
   /** After the 18:30 end-of-day deadline, so the snapshot sees the full session. */
   screenerAt: string;
   /** Earnings and economic calendars, refreshed before the open. */
@@ -32,6 +34,7 @@ export interface ScheduleConfig {
   edgarEnabled: boolean;
   earningsEnabled: boolean;
   releasesEnabled: boolean;
+  shortInterestEnabled: boolean;
   macroSeries: readonly string[];
 }
 
@@ -43,6 +46,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   edgarAt: "21:00",
   insidersAt: "22:30",
   form13fAt: "23:00",
+  shortInterestAt: "19:30",
   screenerAt: "18:45",
   calendarsAt: "06:30",
   alertsAt: "18:50",
@@ -50,6 +54,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   edgarEnabled: false,
   earningsEnabled: false,
   releasesEnabled: false,
+  shortInterestEnabled: false,
   macroSeries: [],
 };
 
@@ -122,6 +127,13 @@ export function dueJobs(now: Date, cfg: ScheduleConfig = DEFAULT_SCHEDULE): JobR
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.insidersAt)) {
     jobs.push({ name: JOBS.sweepInsiders, data: {}, jobId: jobId(JOBS.sweepInsiders, today) });
+  }
+  if (cfg.shortInterestEnabled && etMinutes >= minutesOfDay(cfg.shortInterestAt)) {
+    jobs.push({
+      name: JOBS.ingestShortInterest,
+      data: {},
+      jobId: jobId(JOBS.ingestShortInterest, today),
+    });
   }
   if (cfg.edgarEnabled && etMinutes >= minutesOfDay(cfg.form13fAt)) {
     jobs.push({ name: JOBS.schedule13f, data: {}, jobId: jobId(JOBS.schedule13f, today) });

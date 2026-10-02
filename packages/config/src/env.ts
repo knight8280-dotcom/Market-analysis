@@ -23,6 +23,7 @@ export const SECRET_ENV_KEYS = [
   "FRED_API_KEY",
   "TIINGO_API_KEY",
   "FINNHUB_API_KEY",
+  "FINRA_API_CLIENT_SECRET",
   "RESEND_API_KEY",
   "OWNER_PASSWORD_HASH",
   "SESSION_SECRET",
@@ -65,6 +66,9 @@ export const workerEnvSchema = z
     /** Symbols to ingest (default: config/universe.json). */
     UNIVERSE_FILE: z.string().min(1).optional(),
     FINNHUB_API_KEY: z.string().min(1).optional(),
+    /** FINRA Query API "Public" credential (free; short interest). Both or neither. */
+    FINRA_API_CLIENT_ID: z.string().min(1).optional(),
+    FINRA_API_CLIENT_SECRET: z.string().min(1).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
     /** Where alert emails go: the owner's address (personal use only). */
     ALERT_EMAIL_TO: z.email().optional(),
@@ -114,6 +118,13 @@ export const workerEnvSchema = z
         code: "custom",
         path: [!env.APP_NAME ? "APP_NAME" : "SEC_CONTACT_EMAIL"],
         message: "APP_NAME and SEC_CONTACT_EMAIL are required when EDGAR_ENABLED=true",
+      });
+    }
+    if (Boolean(env.FINRA_API_CLIENT_ID) !== Boolean(env.FINRA_API_CLIENT_SECRET)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [env.FINRA_API_CLIENT_ID ? "FINRA_API_CLIENT_SECRET" : "FINRA_API_CLIENT_ID"],
+        message: "FINRA_API_CLIENT_ID and FINRA_API_CLIENT_SECRET go together",
       });
     }
     if (env.FRED_ENABLED && !env.FRED_API_KEY) {

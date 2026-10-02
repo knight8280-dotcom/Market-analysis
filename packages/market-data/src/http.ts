@@ -162,6 +162,8 @@ export class HttpClient {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
+    // Some query APIs answer "no records" with an empty body.
+    if (text.trim() === "") return null;
     try {
       return JSON.parse(text) as unknown;
     } catch (err) {

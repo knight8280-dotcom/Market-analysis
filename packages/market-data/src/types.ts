@@ -15,6 +15,7 @@ export const PROVIDER_IDS = [
   "fred",
   "treasury",
   "finnhub",
+  "finra",
 ] as const;
 export const ProviderId = z.enum(PROVIDER_IDS);
 export type ProviderId = z.infer<typeof ProviderId>;
@@ -28,6 +29,7 @@ export const DATASETS = [
   "macro",
   "earnings",
   "institutional_holdings",
+  "short_interest",
 ] as const;
 export const Dataset = z.enum(DATASETS);
 export type Dataset = z.infer<typeof Dataset>;
@@ -337,3 +339,20 @@ export const InsiderFiling = Provenance.extend({
   transactions: z.array(InsiderTransaction),
 });
 export type InsiderFiling = z.infer<typeof InsiderFiling>;
+
+/** Equity short interest for one settlement date, as FINRA publishes it (spec §2.5, §5.13). */
+export const ShortInterestRecord = Provenance.extend({
+  /** FINRA's symbol code. */
+  source_symbol: z.string().min(1),
+  settlement_date: IsoDateString,
+  issue_name: z.string().nullable(),
+  market_class: z.string().nullable(),
+  short_interest: z.number().int().nonnegative(),
+  previous_short_interest: z.number().int().nonnegative().nullable(),
+  avg_daily_volume: z.number().int().nonnegative().nullable(),
+  /** FINRA's figure; null when average volume is zero (FINRA then prints 999.99). */
+  days_to_cover: finite.nonnegative().nullable(),
+  revised: z.boolean(),
+  split_adjusted: z.boolean(),
+});
+export type ShortInterestRecord = z.infer<typeof ShortInterestRecord>;

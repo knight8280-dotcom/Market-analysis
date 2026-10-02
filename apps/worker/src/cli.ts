@@ -43,6 +43,7 @@ import { loadUniverse } from "./universe";
  *   check-statements [--ciks ...]        (default: 10 large filers; live SEC requests)
  *   insiders [--days 730] [--tickers AAPL,MSFT] [--limit 500]   (Form 4s already listed by `edgar`)
  *   cusips [--files 6]                   (CUSIPs from SEC's fails-to-deliver files)
+ *   short-interest [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINRA_API_CLIENT_ID and _SECRET)
  *   13f [--latest 2] [--names 01jun2026-31aug2026_form13f.zip] [--force]   (about 100 MB each)
  *   screener
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
@@ -486,6 +487,15 @@ async function main(): Promise<void> {
         });
         break;
       }
+
+      case "short-interest":
+        print(
+          await runJob(ctx, JOBS.ingestShortInterest, {
+            ...(flag("from") ? { from: flag("from") } : {}),
+            ...(flag("to") ? { to: flag("to") } : {}),
+          }),
+        );
+        break;
 
       case "cusips":
         print(await runJob(ctx, JOBS.refreshCusips, { files: Number(flag("files") ?? 6) }));

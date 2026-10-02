@@ -477,6 +477,25 @@ export interface MarketSecuritySymbolHistory {
   valid_to: string | null;
 }
 
+export interface MarketShortInterest {
+  avg_daily_volume: Int8 | null;
+  /**
+   * FINRA's days to cover (short interest / average daily volume); null when average volume is zero, where FINRA prints 999.99.
+   */
+  days_to_cover: Numeric | null;
+  fetched_at: Timestamp;
+  issue_name: string | null;
+  market_class: string | null;
+  previous_short_interest: Int8 | null;
+  revised: Generated<boolean>;
+  security_id: Int8;
+  settlement_date: string;
+  short_interest: Int8;
+  source: Generated<string>;
+  split_adjusted: Generated<boolean>;
+  symbol: string;
+}
+
 export interface Notifications {
   body: Generated<string>;
   created_at: Generated<Timestamp>;
@@ -682,6 +701,7 @@ export interface DB {
   "market.securities": MarketSecurities;
   "market.security_cusips": MarketSecurityCusips;
   "market.security_symbol_history": MarketSecuritySymbolHistory;
+  "market.short_interest": MarketShortInterest;
   notifications: Notifications;
   "ops.alerts": OpsAlerts;
   "ops.data_corrections": OpsDataCorrections;

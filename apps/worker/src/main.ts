@@ -58,6 +58,7 @@ async function main(): Promise<void> {
     edgarEnabled: providers.has("sec_edgar"),
     earningsEnabled: providers.has("finnhub"),
     releasesEnabled: providers.has("fred"),
+    shortInterestEnabled: providers.has("finra"),
     macroSeries: providers.has("fred") ? DEFAULT_MACRO_SERIES : [],
   };
   const tick = async () => {

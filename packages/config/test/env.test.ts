@@ -100,6 +100,21 @@ describe("loadWorkerEnv", () => {
     expect(problems).toContain("DATA_PROVIDER_FALLBACK must differ from DATA_PROVIDER_PRIMARY");
   });
 
+  it("takes FINRA's credential as a pair and treats the secret as secret", () => {
+    expect(problemsOf(() => loadWorkerEnv({ ...worker, FINRA_API_CLIENT_ID: "client-1" }))).toEqual(
+      [expect.stringContaining("FINRA_API_CLIENT_SECRET")],
+    );
+    const source = {
+      ...worker,
+      FINRA_API_CLIENT_ID: "client-1",
+      FINRA_API_CLIENT_SECRET: "finra-secret-value-123",
+    };
+    expect(loadWorkerEnv(source).FINRA_API_CLIENT_ID).toBe("client-1");
+    expect(redactSecrets("token finra-secret-value-123 sent", source)).not.toContain(
+      "finra-secret-value-123",
+    );
+  });
+
   it("requires a declared SEC contact when EDGAR is enabled", () => {
     const problems = problemsOf(() => loadWorkerEnv({ ...worker, EDGAR_ENABLED: "true" }));
     expect(problems.join("\n")).toContain("APP_NAME and SEC_CONTACT_EMAIL are required");

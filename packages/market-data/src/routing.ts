@@ -36,6 +36,7 @@ export function buildRoutingTable(prices: {
     macro: { primary: "fred", fallback: null },
     earnings: { primary: "finnhub", fallback: null },
     institutional_holdings: { primary: "sec_edgar", fallback: null },
+    short_interest: { primary: "finra", fallback: null },
   };
 }
 

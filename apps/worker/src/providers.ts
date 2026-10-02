@@ -6,6 +6,7 @@ import {
   type RoutingTable,
 } from "@market/market-data";
 import { FinnhubProvider } from "@market/market-data/adapters/finnhub";
+import { FinraProvider } from "@market/market-data/adapters/finra";
 import { FredProvider } from "@market/market-data/adapters/fred";
 import { SecEdgarProvider } from "@market/market-data/adapters/sec-edgar";
 import { SyntheticProvider } from "@market/market-data/adapters/synthetic";
@@ -76,6 +77,16 @@ export function buildProviders(
           limit: 30,
           windowMs: 60_000,
         }),
+        now: deps.now,
+      }),
+    );
+  }
+  if (env.FINRA_API_CLIENT_ID && env.FINRA_API_CLIENT_SECRET) {
+    providers.set(
+      "finra",
+      new FinraProvider({
+        clientId: env.FINRA_API_CLIENT_ID,
+        clientSecret: env.FINRA_API_CLIENT_SECRET,
         now: deps.now,
       }),
     );

@@ -26,13 +26,25 @@ test("ticker page LCP under 2.5 s in Lighthouse", async ({ baseURL }) => {
     await expect(page.getByRole("heading", { name: "TEST_SPLIT4", level: 1 })).toBeVisible();
 
     const { default: lighthouse } = await import("lighthouse");
-    const result = await lighthouse(`${baseURL}/stocks/TEST_SPLIT4`, {
-      port: DEBUG_PORT,
-      output: "json",
-      logLevel: "error",
-      onlyCategories: ["performance"],
-      disableStorageReset: true,
-    });
+    const measure = () =>
+      lighthouse(`${baseURL}/stocks/TEST_SPLIT4`, {
+        port: DEBUG_PORT,
+        output: "json",
+        logLevel: "error",
+        onlyCategories: ["performance"],
+        disableStorageReset: true,
+      });
+    let result = await measure();
+    // A runtime error means Lighthouse could not record the load (for example NO_NAVSTART: the
+    // trace has no navigation start, seen locally when the machine is busy right after the
+    // journey spec), so nothing was measured. Measure once more; a slow page still fails below.
+    const failed = result?.lhr.runtimeError?.code;
+    if (failed) {
+      process.stdout.write(`lighthouse recording failed (${failed}); measuring again\n`);
+      test.info().annotations.push({ type: "lighthouse-retry", description: failed });
+      await new Promise((r) => setTimeout(r, 2_000));
+      result = await measure();
+    }
     const audits = result?.lhr.audits ?? {};
     const lcp = audits["largest-contentful-paint"]?.numericValue;
     const report = {

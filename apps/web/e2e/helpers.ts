@@ -11,6 +11,9 @@ export async function signIn(page: Page, path = "/") {
 
 /** WCAG 2.2 AA checks; the build fails on any critical or serious violation. */
 export async function expectAccessible(page: Page) {
+  // After a client-side navigation Next streams the new <title> in after the page content; audit
+  // the settled page, not the moment in between.
+  await expect(page).toHaveTitle(/\S/);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();

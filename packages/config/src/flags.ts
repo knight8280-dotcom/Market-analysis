@@ -39,6 +39,12 @@ export const FEATURE_FLAGS = {
       "Trend lines, horizontal lines, Fibonacci retracements, rectangles and text on ticker charts.",
     default: true,
   },
+  dashboard: {
+    label: "Customizable dashboard",
+    description:
+      "Arrange the Markets page: move, resize, hide and add widgets; the layout is saved.",
+    default: true,
+  },
 } as const satisfies Record<string, FlagDefinition>;
 
 export type FlagKey = keyof typeof FEATURE_FLAGS;

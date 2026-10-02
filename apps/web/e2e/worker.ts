@@ -56,6 +56,9 @@ export async function runAlertsJob(resendUrl: string, appUrl?: string): Promise<
         RESEND_API_KEY: "re_e2e_capture",
         RESEND_API_URL: resendUrl,
         ALERT_EMAIL_TO: "owner@e2e.invalid",
+        // Re-running the suite on one database the same day would reach the default cap of 20
+        // emails; the cap itself is covered by the worker's integration tests.
+        ALERT_DAILY_CAP: "1000",
         ...(appUrl ? { APP_BASE_URL: appUrl } : {}),
         LOG_LEVEL: "warn",
       },

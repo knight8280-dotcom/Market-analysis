@@ -170,6 +170,12 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - Ranking a sweep by Sharpe ratio needs T-bill rates (FRED `DTB3`, ingested when `FRED_ENABLED` is set); without them the builder ranks by CAGR.
 - `/settings` can turn Backtests off; runs and strategies are kept.
 
+## Dashboard
+
+- "Customize" on the Markets page arranges it: each widget can move up or down, be full or half width, or be hidden (hidden ones are listed at the top to show again); on a desktop a widget can also be dragged by its handle onto another. Changes save as you make them; "Reset layout" returns to the standard one and "Done" leaves editing.
+- The screen widget shows the first saved screen by name, or the one picked while customizing.
+- "Customizable dashboard" can be switched off on `/settings`; the standard layout then shows.
+
 ## Chart drawings
 
 - On a ticker's chart, pick a tool (trend line, horizontal line, Fibonacci retracement, rectangle, text) and click the chart: one click for a horizontal line or text, two for the others. Escape or "Stop drawing" puts the pen down. "Drawings" under the chart lists them in words, deletes them, and adds one from typed dates and prices.

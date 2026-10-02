@@ -284,3 +284,13 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Every drawing is also listed in words with a delete button, and a form adds any of them from the keyboard with dates and prices. Saved through server actions (owner only, validated with the same schema as the chart, at most 100 per chart and basis) in `public.chart_drawings` (migration 16).
   - Behind the `drawings` flag, on by default. The web app now lists `zod` (already used by every package, same version) as a direct dependency for the shared drawing schema.
 - **Consequences:** drawings cannot be dragged to a new place; delete and redraw instead. A drawing made on raw prices does not follow a later split.
+
+## ADR-030: A dashboard arranged with buttons first, dragging second
+
+- **Context:** spec §6 asks for a customizable dashboard with a drag-and-drop widget grid saved per user ("react-grid-layout or similar"), and WCAG 2.2 (2.5.7) requires a way to do every drag without dragging. A grid library brings a dependency, free-form sizes and its own accessibility gaps, for a page one person arranges now and then.
+- **Decision:**
+  - The layout is an ordered list of widgets, each full or half width and shown or hidden (`public.dashboard_layouts`, migration 16; validated on read, so a stored layout with unknown or repeated widgets still loads, and widgets added later appear at the end). Eight widgets: index ETFs, watchlists, recent alerts, top gainers, top losers, portfolios, coming up (earnings and economic releases) and a saved screen's results; each labels its figures with source and as-of date like the rest of the app.
+  - "Customize" turns on an editing bar per widget: move up or down among the visible widgets, full or half width, hide (and show again from a list), and which saved screen the screen widget shows. Each change is one server action that returns the saved layout; the page refreshes without navigating and focus goes back to the button that was used, so a keyboard user can press Enter repeatedly to move a widget several places.
+  - On a desktop, a widget can also be dragged by its handle onto another (native HTML5 drag and drop, no library); the drop is the same "order" change. Touch screens use the buttons.
+  - Behind the `dashboard` flag; when it is off, the standard layout shows and nothing can be changed.
+- **Consequences:** no free-form grid: two columns on wide screens, one on narrow ones. A drag needs both widgets on screen, since the page does not scroll while dragging; the buttons work anywhere.

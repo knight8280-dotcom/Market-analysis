@@ -59,8 +59,12 @@ test("the ticker page adds to and removes from a watchlist", async ({ page }) =>
   await page.locator("summary", { hasText: /^Watchlists/ }).click();
   await page.getByRole("button", { name: `Add to ${name}` }).click();
   await expect(page).toHaveURL(/\/stocks\/TEST_DIV(\?|$)/);
+  // The menu comes back closed with the security in the list (TEST_DIV may already be in other
+  // lists, so the count alone does not show the add has finished).
+  const remove = page.getByRole("button", { name: `Remove from ${name}`, includeHidden: true });
+  await expect(remove).toBeAttached();
   await page.locator("summary", { hasText: /^Watchlists \(\d+\)/ }).click();
-  await expect(page.getByRole("button", { name: `Remove from ${name}` })).toBeVisible();
+  await expect(remove).toBeVisible();
 
   await page.goto("/watchlists");
   await page.getByRole("link", { name: new RegExp(name) }).click();

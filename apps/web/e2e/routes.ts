@@ -6,11 +6,13 @@ export const PAGE_ROUTES: Record<string, string> = {
   "/": "/",
   "/admin/data-health": "/admin/data-health",
   "/alerts": "/alerts",
+  "/alerts/[id]": "/alerts/1",
   "/backtests": "/backtests",
   "/backtests/[id]": "/backtests/1",
   "/backtests/new": "/backtests/new",
   "/calendar": "/calendar",
   "/heatmap": "/heatmap",
+  "/notifications": "/notifications",
   "/portfolio": "/portfolio",
   "/screener": "/screener",
   "/settings": "/settings",
@@ -22,6 +24,7 @@ export const PAGE_ROUTES: Record<string, string> = {
 
 export const API_ROUTES: Record<string, string> = {
   "/api/calendar": "/api/calendar?tab=earnings",
+  "/api/notifications/unread": "/api/notifications/unread",
   "/api/search": "/api/search?q=TEST",
   "/api/stocks/[ticker]/series": "/api/stocks/TEST_DIV/series",
   "/api/stream": "/api/stream?ids=1",

@@ -25,13 +25,13 @@ export const FEATURE_FLAGS = {
     label: "More alert types",
     description:
       "RSI and moving-average crossings, volume spikes, new SEC filings and changes in a saved screen's results.",
-    default: false,
+    default: true,
   },
   notifications: {
     label: "Notifications",
     description:
       "In-app notifications when alerts fire, with snooze and delete; the bell in the header.",
-    default: false,
+    default: true,
   },
 } as const satisfies Record<string, FlagDefinition>;
 

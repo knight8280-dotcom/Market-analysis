@@ -13,8 +13,12 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertForm } from "../../../components/alert-form";
-import { listAlerts, recentAlertEvents, type AlertEventRow } from "../../../server/alerts";
+import { EVENT_STATUS } from "../../../components/alert-status";
+import { CONDITION_HELP, isAlertKind } from "../../../lib/alert-form";
+import { listAlerts, recentAlertEvents, type AlertRow } from "../../../server/alerts";
 import { requireOwner } from "../../../server/auth/owner";
+import { enabledFlags } from "../../../server/flags";
+import { savedScreens } from "../../../server/screens";
 import { deleteAlert, setAlertActive } from "./actions";
 
 export const metadata: Metadata = { title: "Alerts" };
@@ -23,44 +27,64 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 const ERRORS: Record<string, string> = {
   ticker: "No security with that ticker is loaded.",
-  condition: "Check the condition: a positive price, a move between 0% and 100%, or 1 to 30 days.",
+  screen: "Pick one of your saved screens.",
   cooldown: "The cooldown must be between 0 and 720 hours.",
 };
 
-const STATUS: Record<
-  AlertEventRow["status"],
-  { label: string; tone: "up" | "down" | "warning" | "neutral" }
-> = {
-  sent: { label: "Emailed", tone: "up" },
-  pending: { label: "Sending", tone: "neutral" },
-  failed: { label: "Failed", tone: "down" },
-  suppressed: { label: "Not emailed", tone: "warning" },
-};
+const label = (a: AlertRow) => (a.target.type === "screen" ? a.target.name : a.target.ticker);
 
-/** Alerts (Phase 1 step I): conditions checked after each end-of-day load, emailed to the owner. */
+/**
+ * Alerts (Phase 1 step I, Phase 2 group E): conditions checked as end-of-day data, filings and
+ * screener results arrive, emailed to the owner and listed under Notifications.
+ */
 export default async function AlertsPage({ searchParams }: { searchParams: Search }) {
   await requireOwner();
   const q = await searchParams;
   const one = (k: string) => (typeof q[k] === "string" ? q[k] : undefined);
-  const error = ERRORS[one("error") ?? ""];
-  const [alerts, events] = await Promise.all([listAlerts(), recentAlertEvents()]);
+  const kind = one("kind");
+  const error =
+    one("error") === "condition"
+      ? `Check the condition.${kind && isAlertKind(kind) ? ` ${CONDITION_HELP[kind]}` : ""}`
+      : ERRORS[one("error") ?? ""];
+  const [alerts, events, flags, screens] = await Promise.all([
+    listAlerts(),
+    recentAlertEvents(),
+    enabledFlags(),
+    savedScreens(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">Alerts</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Checked on end-of-day closes after each session&apos;s data loads (18:50 ET). Price alerts
-          fire when the close crosses your level, once per crossing. Emails go to your own address
-          when the worker has <code>RESEND_API_KEY</code> and <code>ALERT_EMAIL_TO</code>; every
-          event is listed here either way.
+          Checked on end-of-day data as soon as it loads, and again at 18:50 ET. Price, RSI and
+          moving-average alerts fire when a value crosses your level, once per crossing; filing and
+          screen alerts report what is new since they last fired. Emails go to your own address when
+          the worker has <code>RESEND_API_KEY</code> and <code>ALERT_EMAIL_TO</code>; every event is
+          listed here either way
+          {flags.notifications ? (
+            <>
+              {" "}
+              and under{" "}
+              <Link href="/notifications" className="text-primary underline">
+                Notifications
+              </Link>
+            </>
+          ) : null}
+          .
         </p>
       </div>
 
       <Card>
         <CardHeader title="New alert" />
         <CardContent className="flex flex-col gap-3">
-          <AlertForm ticker={one("ticker")} />
+          <AlertForm
+            ticker={one("ticker")}
+            kind={kind}
+            moreKinds={flags.alert_types}
+            screens={screens.map((s) => ({ id: s.id, name: s.name }))}
+          />
           {error ? (
             <p role="alert" className="text-sm text-down">
               {error}
@@ -89,7 +113,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
-                    <Th>Ticker</Th>
+                    <Th>Watches</Th>
                     <Th>Condition</Th>
                     <Th className="hidden md:table-cell">Cooldown</Th>
                     <Th className="hidden md:table-cell">Last fired</Th>
@@ -103,12 +127,21 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                   {alerts.map((a) => (
                     <tr key={a.id} data-testid={`alert-${a.id}`}>
                       <Td>
-                        <Link
-                          href={`/stocks/${encodeURIComponent(a.ticker)}`}
-                          className="font-mono font-medium text-primary hover:underline"
-                        >
-                          {a.ticker}
-                        </Link>
+                        {a.target.type === "screen" ? (
+                          <Link
+                            href={`/screener?saved=${encodeURIComponent(a.target.screenId)}`}
+                            className="text-primary hover:underline"
+                          >
+                            Screen: {a.target.name}
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/stocks/${encodeURIComponent(a.target.ticker)}`}
+                            className="font-mono font-medium text-primary hover:underline"
+                          >
+                            {a.target.ticker}
+                          </Link>
+                        )}
                       </Td>
                       <Td>{a.condition}</Td>
                       <Td className="hidden md:table-cell">
@@ -118,12 +151,29 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                         {a.lastFiredAt ? formatDateTimeET(a.lastFiredAt) : "Never"}
                       </Td>
                       <Td>
-                        <Badge tone={a.active ? "info" : "neutral"}>
-                          {a.active ? "Active" : "Paused"}
-                        </Badge>
+                        <span className="flex flex-col gap-0.5">
+                          <Badge
+                            tone={!a.active ? "neutral" : a.snoozedUntil ? "warning" : "info"}
+                            className="w-fit"
+                          >
+                            {!a.active ? "Paused" : a.snoozedUntil ? "Snoozed" : "Active"}
+                          </Badge>
+                          {a.active && a.snoozedUntil ? (
+                            <span className="text-xs whitespace-nowrap text-muted-foreground">
+                              until {formatDateTimeET(a.snoozedUntil)}
+                            </span>
+                          ) : null}
+                        </span>
                       </Td>
                       <Td>
                         <span className="flex justify-end gap-1">
+                          <Link
+                            href={`/alerts/${a.id}`}
+                            className="inline-flex min-h-8 items-center px-2 text-sm text-primary hover:underline"
+                            aria-label={`Manage ${label(a)} alert: ${a.condition}`}
+                          >
+                            Manage
+                          </Link>
                           <form action={setAlertActive}>
                             <input type="hidden" name="id" value={a.id} />
                             <input type="hidden" name="active" value={String(!a.active)} />
@@ -131,7 +181,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                               type="submit"
                               variant="ghost"
                               size="sm"
-                              aria-label={`${a.active ? "Pause" : "Resume"} ${a.ticker} alert: ${a.condition}`}
+                              aria-label={`${a.active ? "Pause" : "Resume"} ${label(a)} alert: ${a.condition}`}
                             >
                               {a.active ? "Pause" : "Resume"}
                             </Button>
@@ -142,7 +192,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                               type="submit"
                               variant="ghost"
                               size="sm"
-                              aria-label={`Delete ${a.ticker} alert: ${a.condition}`}
+                              aria-label={`Delete ${label(a)} alert: ${a.condition}`}
                             >
                               Delete
                             </Button>
@@ -177,11 +227,15 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                   {events.map((e) => (
                     <tr key={e.id} data-testid={`event-${e.id}`}>
                       <Td className="whitespace-nowrap">{formatDate(e.date)}</Td>
-                      <Td>{e.subject}</Td>
+                      <Td>
+                        <Link href={`/alerts/${e.alertId}`} className="hover:underline">
+                          {e.subject}
+                        </Link>
+                      </Td>
                       <Td>
                         <span className="flex flex-col gap-0.5">
-                          <Badge tone={STATUS[e.status].tone} className="w-fit">
-                            {STATUS[e.status].label}
+                          <Badge tone={EVENT_STATUS[e.status].tone} className="w-fit">
+                            {EVENT_STATUS[e.status].label}
                           </Badge>
                           {e.error ? (
                             <span className="text-xs text-muted-foreground">{e.error}</span>

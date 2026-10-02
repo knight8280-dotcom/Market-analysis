@@ -7,7 +7,9 @@ import type { ReactNode } from "react";
 import { BRAND } from "../../brand";
 import { CommandMenu } from "../../components/command-menu";
 import { Nav } from "../../components/nav";
+import { NotificationBell } from "../../components/notification-bell";
 import { ThemeToggle } from "../../components/theme-toggle";
+import { unreadNotifications } from "../../server/alerts";
 import { requireOwner } from "../../server/auth/owner";
 import { db } from "../../server/db";
 import { enabledFlags } from "../../server/flags";
@@ -27,6 +29,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     currentTheme(),
     enabledFlags(),
   ]);
+  const unread = flags.notifications ? await unreadNotifications() : 0;
 
   return (
     <>
@@ -62,6 +65,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               )}
             </p>
             <div className="ml-auto flex items-center gap-1">
+              {flags.notifications ? <NotificationBell key={unread} initial={unread} /> : null}
               <ThemeToggle initial={theme} />
               <form action={logout}>
                 <Button type="submit" variant="ghost" size="sm">

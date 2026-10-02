@@ -149,6 +149,8 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **Email setup** (optional; without it events are listed on `/alerts` as "Not emailed"): create a free Resend account with your own address, create an API key, and set `RESEND_API_KEY` and `ALERT_EMAIL_TO` (that same address) in `.env`. The default sender, `onboarding@resend.dev`, delivers only to the account's own address, which is all personal use needs. `ALERT_DAILY_CAP` (default 20) limits emails per day; the rest are recorded as suppressed.
 - **A failed email** (status "Failed" with Resend's error) is retried by the job's own retries; if it keeps failing, check the key and address, then run `pnpm worker alerts` again. Failed events older than a day are not retried.
 - To check delivery end to end without Resend, point `RESEND_API_URL` at a local capture server (the E2E test does this).
+- **Notifications:** every alert that fires also appears under the bell in the header (`/notifications`); opening the page marks them read. Each one can snooze its alert (1 day, 3 days or a week), pause it, delete it (with its notifications), or be dismissed on its own. Each alert has a page (`/alerts/<id>`, also linked from emails) with its state and what it fired. A snoozed filing or screen alert reports what it held back once the snooze ends; price and indicator crossings during a snooze are not replayed.
+- **More alert types** (RSI, moving averages, volume, filings, screens) and **Notifications** can be switched off on `/settings`; while "More alert types" is off, those alerts are not checked.
 
 ## Portfolio
 

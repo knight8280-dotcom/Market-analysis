@@ -37,8 +37,11 @@ export async function startCaptureServer() {
   };
 }
 
-/** Runs `pnpm worker alerts` against the E2E database, emailing through `resendUrl`. */
-export async function runAlertsJob(resendUrl: string): Promise<string> {
+/**
+ * Runs `pnpm worker alerts` against the E2E database, emailing through `resendUrl`; links in the
+ * emails point at `appUrl` (the app under test).
+ */
+export async function runAlertsJob(resendUrl: string, appUrl?: string): Promise<string> {
   const { stdout } = await promisify(execFile)(
     "pnpm",
     ["--silent", "--filter", "@market/worker", "run", "cli", "alerts"],
@@ -53,6 +56,7 @@ export async function runAlertsJob(resendUrl: string): Promise<string> {
         RESEND_API_KEY: "re_e2e_capture",
         RESEND_API_URL: resendUrl,
         ALERT_EMAIL_TO: "owner@e2e.invalid",
+        ...(appUrl ? { APP_BASE_URL: appUrl } : {}),
         LOG_LEVEL: "warn",
       },
       timeout: 60_000,

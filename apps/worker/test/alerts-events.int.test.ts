@@ -193,6 +193,7 @@ describe("flags", () => {
         ticker: "TEST_IND",
       },
     );
+    await setFlag("alert_types", false);
     const off = (await h.run("evaluate-alerts", { kinds: ["sma_cross"] })) as Record<
       string,
       unknown

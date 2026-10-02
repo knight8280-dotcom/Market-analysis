@@ -93,7 +93,7 @@ export default async function MarketsPage() {
     latestQuotes(database, source, { tickers: INDEX_ETFS }),
     movers(database, source, session),
     listWatchlists(),
-    recentAlertEvents(5),
+    recentAlertEvents({ limit: 5 }),
   ]);
   const label = (
     <DataLabel source={sourceInfo(source)} kind="eod" asOf={session} fetchedAt={updated.loadedAt} />

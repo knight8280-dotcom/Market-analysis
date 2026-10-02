@@ -402,3 +402,25 @@ export async function chartActions(
     return { date: r.ex_date, type: r.type, label };
   });
 }
+
+/**
+ * 3-month T-bill rates (FRED DTB3) as decimal annual rates, from the last observation on or
+ * before `from` to `to`; null when none is stored.
+ */
+export async function riskFreeRates(
+  database: Database,
+  from: string,
+  to: string,
+): Promise<{ dates: string[]; rate: number[] } | null> {
+  const rows = await sql<{ date: string; value: number }>`
+    select date, value::float8 as value from market.macro_observations
+    where series_id = 'DTB3' and value is not null and date <= ${to}::date
+      and date >= coalesce(
+        (select max(date) from market.macro_observations
+          where series_id = 'DTB3' and value is not null and date <= ${from}::date),
+        ${from}::date)
+    order by date
+  `.execute(database);
+  if (rows.rows.length === 0) return null;
+  return { dates: rows.rows.map((r) => r.date), rate: rows.rows.map((r) => r.value / 100) };
+}

@@ -13,13 +13,23 @@ Conventions (ADR-023): FIFO lots; a split multiplies the quantity of lots opened
 ex-date; cash shortfalls at the end of a day are implicit deposits; flows count at the start of
 the day, r = V_t / (V_{t-1} + F_t) - 1; XIRR on actual/365 days, found by bisection.
 
+Risk measures (Phase 2 step C1), computed the textbook way on the time-weighted index at each
+market session: volatility = sample standard deviation of session returns × √252; Sharpe and
+Sortino on returns in excess of the T-bill rate ÷ 252 (latest observation on or before each
+session); the longest drawdown in sessions, from a peak until it is regained (or the end);
+beta = cov(p, b) ÷ var(b) and the Pearson correlation against the benchmark; the correlation of
+the two holdings' total returns; concentration (top-10 share and Herfindahl index of holding
+weights); daily P&L = value − previous value − external flow.
+
 Run: python3 packages/portfolio/scripts/make_fixture.py   (standard library only)
 """
 import csv
 import datetime as dt
 import json
+import math
 import os
 import random
+import statistics
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "test", "fixtures")
@@ -183,6 +193,82 @@ for sec, book in lots.items():
     positions.append({"securityId": sec, "quantity": qty, "costBasis": basis, "price": price,
                       "marketValue": qty * price, "unrealized": qty * price - basis})
 
+# ---- risk (Phase 2 step C1) ---------------------------------------------------------------
+# Made-up 3-month T-bill rates (decimal, annual), on a few observation dates.
+risk_free = {"dates": ["2024-12-31", "2025-02-03", "2025-03-03"], "rate": [0.0431, 0.0427, 0.0419]}
+sessions = [d for d in days if rows_dates[0] <= d <= END]
+
+
+def at_or_before(dates, values, d):
+    known = [i for i, x in enumerate(dates) if x <= d]
+    return values[known[-1]] if known else None
+
+
+row_dates = [r["date"] for r in table]
+idx = [at_or_before(row_dates, [r["index"] for r in table], d) for d in sessions]
+rets = [idx[i] / idx[i - 1] - 1 for i in range(1, len(idx))]
+rf_daily = [at_or_before(risk_free["dates"], risk_free["rate"], d) / 252 for d in sessions[1:]]
+excess = [r - f for r, f in zip(rets, rf_daily)]
+volatility = statistics.stdev(rets) * math.sqrt(252)
+sharpe = statistics.mean(excess) / statistics.stdev(excess) * math.sqrt(252)
+downside = math.sqrt(sum(min(x, 0.0) ** 2 for x in excess) / len(excess))
+sortino = statistics.mean(excess) / downside * math.sqrt(252)
+
+def underwater_spells(series):
+    """Longest drawdown in sessions: from a peak to the session that regains it, or to the end."""
+    best, run, peak = 0, 0, series[0]
+    for v in series:
+        if v >= peak:
+            peak = v
+            if run:
+                best = max(best, run + 1)
+            run = 0
+        else:
+            run += 1
+    if run:
+        best = max(best, run)
+    return best
+
+
+bm_at = [at_or_before(days, bm, d) for d in sessions]
+bm_rets = [bm_at[i] / bm_at[i - 1] - 1 for i in range(1, len(bm_at))]
+mp, mb = statistics.mean(rets), statistics.mean(bm_rets)
+cov_pb = sum((p - mp) * (q - mb) for p, q in zip(rets, bm_rets)) / (len(rets) - 1)
+beta_value = cov_pb / statistics.variance(bm_rets)
+corr_value = cov_pb / (statistics.stdev(rets) * statistics.stdev(bm_rets))
+
+# The two holdings' total returns: B's closes before its split, in today's share basis.
+b_adjusted = [p / 2 if d < SPLIT_B else p for d, p in zip(days, b)]
+ra = [a[i] / a[i - 1] - 1 for i in range(1, len(days))]
+rb = [b_adjusted[i] / b_adjusted[i - 1] - 1 for i in range(1, len(days))]
+ma, mb2 = statistics.mean(ra), statistics.mean(rb)
+corr_ab = (sum((x - ma) * (y - mb2) for x, y in zip(ra, rb)) / (len(ra) - 1)) / (
+    statistics.stdev(ra) * statistics.stdev(rb))
+
+values_held = [p["marketValue"] for p in positions]
+w = sorted((v / sum(values_held) for v in values_held), reverse=True)
+hhi = sum(x * x for x in w)
+pnl = []
+prev = 0.0
+for row in table:
+    pnl.append({"date": row["date"], "pnl": row["value"] - prev - row["flow"]})
+    prev = row["value"]
+
+risk = {
+    "sessions": len(sessions),
+    "volatility": volatility,
+    "sharpe": sharpe,
+    "sortino": sortino,
+    "maxDrawdownDuration": underwater_spells(idx),
+    "beta": beta_value,
+    "correlation": corr_value,
+    "holdingsCorrelation": corr_ab,
+    "top10": sum(w[:10]),
+    "hhi": hhi,
+    "cashWeight": table[-1]["cash"] / table[-1]["value"],
+    "dailyPnl": pnl,
+}
+
 bm_first = next(i for i, d in enumerate(days) if d >= rows_dates[0])
 bm_last = max(i for i, d in enumerate(days) if d <= END)
 expected = {
@@ -198,6 +284,7 @@ expected = {
     "fees": fees,
     "positions": positions,
     "benchmarkTotal": bm[bm_last] / bm[bm_first] - 1,
+    "risk": risk,
     "days": table,
 }
 scenario = {
@@ -205,6 +292,8 @@ scenario = {
     "calendar": days,
     "prices": {"A": {"dates": days, "closes": a}, "B": {"dates": days, "closes": b}},
     "benchmark": {"dates": days, "closes": bm},
+    "adjusted": {"A": {"dates": days, "closes": a}, "B": {"dates": days, "closes": b_adjusted}},
+    "riskFree": risk_free,
     "splits": splits,
     "transactions": txs,
 }
@@ -223,3 +312,6 @@ with open(os.path.join(OUT, "expected.csv"), "w", newline="") as f:
                     f"{row['index']:.10f}"])
 print(f"days={len(table)} twr={expected['twr']:.6%} xirr={xirr_value:.6%} mdd={mdd:.6%} "
       f"value={expected['value']:.2f} realized={realized:.2f}")
+print(f"risk: vol={volatility:.6f} sharpe={sharpe:.6f} sortino={sortino:.6f} "
+      f"underwater={risk['maxDrawdownDuration']} beta={beta_value:.6f} corr={corr_value:.6f} "
+      f"corrAB={corr_ab:.6f} hhi={hhi:.6f}")

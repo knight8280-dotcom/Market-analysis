@@ -180,6 +180,9 @@ importers:
       '@market/indicators':
         specifier: workspace:*
         version: link:../indicators
+      '@market/metrics':
+        specifier: workspace:*
+        version: link:../metrics
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -248,8 +251,13 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
+  packages/metrics: {}
+
   packages/portfolio:
     dependencies:
+      '@market/metrics':
+        specifier: workspace:*
+        version: link:../metrics
       zod:
         specifier: 4.6.5
         version: 4.6.5

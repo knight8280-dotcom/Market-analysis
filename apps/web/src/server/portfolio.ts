@@ -1,4 +1,5 @@
 import "server-only";
+import { tradingDaysBetween } from "@market/calendar";
 import { OWNER_USER_ID } from "@market/config";
 import { sql, type Database } from "@market/db";
 import type { ProviderId } from "@market/market-data";
@@ -6,12 +7,15 @@ import {
   analyzePortfolio,
   benchmarkIndex,
   benchmarkReturn,
+  portfolioRisk,
   type PortfolioReport,
+  type PortfolioRisk,
   type ShareAction,
   type Tx,
   type TxType,
 } from "@market/portfolio";
 import { db } from "./db";
+import { riskFreeRates } from "./market";
 
 export interface PortfolioSummary {
   id: string;
@@ -114,6 +118,7 @@ export interface HoldingInfo {
   ticker: string;
   name: string;
   sector: string | null;
+  assetClass: string;
 }
 
 export interface PortfolioView {
@@ -126,6 +131,9 @@ export interface PortfolioView {
     annualized: number | null;
   } | null;
   securities: Map<string, HoldingInfo>;
+  /** Risk measures (Phase 2 step C1); `riskFree` says whether T-bill rates were available. */
+  risk: PortfolioRisk;
+  riskFree: boolean;
 }
 
 /**
@@ -158,7 +166,7 @@ export async function portfolioView(
     ids.length
       ? database
           .selectFrom("market.securities")
-          .select(["security_id", "ticker", "name", "sector"])
+          .select(["security_id", "ticker", "name", "sector", "asset_class"])
           .where("security_id", "in", ids)
           .execute()
       : Promise.resolve([]),
@@ -194,11 +202,44 @@ export async function portfolioView(
       annualized: ret?.annualized ?? null,
     };
   }
+  // Risk: session returns of the time-weighted index, T-bill rates, and a year of total
+  // returns for the current holdings' correlations.
+  const held = report.positions.map((p) => p.securityId);
+  const [adjustedRows, rates] = await Promise.all([
+    held.length
+      ? sql<{ security_id: string; date: string; close: number }>`
+          select security_id, date, close from market.prices_daily_adjusted
+          where source = ${source} and security_id = any(${held}::bigint[])
+            and date > ${session}::date - 400 and date <= ${session}::date
+          order by security_id, date
+        `.execute(database)
+      : Promise.resolve({ rows: [] }),
+    report.start ? riskFreeRates(database, report.start, session) : Promise.resolve(null),
+  ]);
+  const adjusted = new Map<string, { dates: string[]; closes: number[] }>();
+  for (const r of adjustedRows.rows) {
+    const series = adjusted.get(r.security_id) ?? { dates: [], closes: [] };
+    series.dates.push(r.date);
+    series.closes.push(r.close);
+    adjusted.set(r.security_id, series);
+  }
+  const risk = portfolioRisk(report, {
+    sessions: report.start ? tradingDaysBetween(report.start, session) : [],
+    benchmark: benchmark?.index ?? null,
+    riskFree: rates,
+    adjusted,
+  });
+
   return {
     report,
     benchmark,
+    risk,
+    riskFree: rates !== null,
     securities: new Map(
-      info.map((s) => [s.security_id, { ticker: s.ticker, name: s.name, sector: s.sector }]),
+      info.map((s) => [
+        s.security_id,
+        { ticker: s.ticker, name: s.name, sector: s.sector, assetClass: s.asset_class },
+      ]),
     ),
   };
 }

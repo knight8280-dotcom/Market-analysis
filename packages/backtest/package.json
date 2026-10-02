@@ -17,6 +17,7 @@
   "dependencies": {
     "@market/calendar": "workspace:*",
     "@market/indicators": "workspace:*",
+    "@market/metrics": "workspace:*",
     "zod": "4.6.5"
   },
   "devDependencies": {

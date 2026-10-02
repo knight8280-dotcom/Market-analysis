@@ -21,6 +21,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ImportForm } from "../../../components/portfolio/import-form";
 import { PerformanceChart } from "../../../components/performance-chart";
+import { RiskPanel } from "../../../components/portfolio/risk-panel";
 import { TransactionForm } from "../../../components/portfolio/tx-form";
 import { requireOwner } from "../../../server/auth/owner";
 import { db } from "../../../server/db";
@@ -34,6 +35,49 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 const qty = (n: number | null) =>
   n === null ? "—" : new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(n);
+const ASSET_LABEL: Record<string, string> = {
+  equity: "Stocks",
+  adr: "Stocks (ADRs)",
+  etf: "ETFs",
+  fund: "Funds",
+  preferred: "Preferred shares",
+};
+
+/** Shares of the portfolio's value, as labelled bars (the percentage is always written). */
+function AllocationList({
+  label,
+  items,
+  total,
+}: {
+  label: string;
+  items: [string, number][];
+  total: number;
+}) {
+  return (
+    <ul aria-label={label} className="flex flex-col gap-2 text-sm">
+      {items.map(([name, value]) => {
+        const w = total > 0 ? value / total : 0;
+        return (
+          <li key={name} className="flex flex-col gap-1">
+            <span className="flex justify-between gap-2">
+              <span>{name}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {formatPercent(w, 1).replace("+", "")}
+              </span>
+            </span>
+            <span aria-hidden className="h-1.5 rounded bg-muted">
+              <span
+                className="block h-1.5 rounded bg-primary"
+                style={{ width: `${Math.max(0, Math.min(1, w)) * 100}%` }}
+              />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 const TYPE_LABEL: Record<string, string> = {
   buy: "Buy",
   sell: "Sell",
@@ -131,6 +175,14 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
   }
   if (report && report.cash > 0.005) sectors.set("Cash", report.cash);
   const allocation = [...sectors].sort((a, b) => b[1] - a[1]);
+  const classes = new Map<string, number>();
+  for (const p of report?.positions ?? []) {
+    const c = info(p.securityId)?.assetClass ?? "unknown";
+    const name = ASSET_LABEL[c] ?? c[0]!.toUpperCase() + c.slice(1);
+    classes.set(name, (classes.get(name) ?? 0) + p.marketValue);
+  }
+  if (report && report.cash > 0.005) classes.set("Cash", report.cash);
+  const byClass = [...classes].sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -249,6 +301,13 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
             </CardContent>
           </Card>
 
+          <RiskPanel
+            risk={view.risk}
+            benchmark={view.benchmark?.ticker ?? null}
+            riskFreeStored={view.riskFree}
+            tickers={(id) => info(id)?.ticker ?? id}
+          />
+
           {report.warnings.length ? (
             <div
               role="note"
@@ -352,29 +411,29 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
               </CardContent>
             </Card>
             <Card>
-              <CardHeader title="Allocation" description="By sector (SIC-based), with cash" />
-              <CardContent>
-                <ul aria-label="Allocation by sector" className="flex flex-col gap-2 text-sm">
-                  {allocation.map(([name, value]) => {
-                    const w = report.value > 0 ? value / report.value : 0;
-                    return (
-                      <li key={name} className="flex flex-col gap-1">
-                        <span className="flex justify-between gap-2">
-                          <span>{name}</span>
-                          <span className="tabular-nums text-muted-foreground">
-                            {formatPercent(w, 1).replace("+", "")}
-                          </span>
-                        </span>
-                        <span aria-hidden className="h-1.5 rounded bg-muted">
-                          <span
-                            className="block h-1.5 rounded bg-primary"
-                            style={{ width: `${Math.max(0, Math.min(1, w)) * 100}%` }}
-                          />
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+              <CardHeader
+                title="Allocation"
+                description="Shares of the portfolio's value, with cash"
+              />
+              <CardContent className="flex flex-col gap-5">
+                <section className="flex flex-col gap-2">
+                  <h3 className="text-xs font-medium text-muted-foreground">By asset class</h3>
+                  <AllocationList
+                    label="Allocation by asset class"
+                    items={byClass}
+                    total={report.value}
+                  />
+                </section>
+                <section className="flex flex-col gap-2">
+                  <h3 className="text-xs font-medium text-muted-foreground">
+                    By sector (SIC-based)
+                  </h3>
+                  <AllocationList
+                    label="Allocation by sector"
+                    items={allocation}
+                    total={report.value}
+                  />
+                </section>
               </CardContent>
             </Card>
           </div>

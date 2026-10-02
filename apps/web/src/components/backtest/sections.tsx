@@ -70,7 +70,7 @@ const METRIC_ROWS: {
     label: "Longest drawdown",
     key: "maxDrawdownDuration",
     format: (v) => sessions(v),
-    note: "Sessions spent below a previous peak",
+    note: "Sessions from a peak until it was regained, or to the end",
   },
   { label: "Calmar ratio", key: "calmar", format: (v) => num(v), note: "CAGR ÷ max drawdown" },
   { label: "Best month", key: "bestMonth", format: (v) => pct(v) },

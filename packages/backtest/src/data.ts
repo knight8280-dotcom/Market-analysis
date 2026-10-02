@@ -81,19 +81,4 @@ export interface BacktestData {
   riskFree: { dates: string[]; rate: number[] } | null;
 }
 
-/** Index of the last date ≤ `date` in an ascending list, or -1. */
-export function lastIndexAtOrBefore(dates: readonly string[], date: string): number {
-  let lo = 0;
-  let hi = dates.length - 1;
-  let ans = -1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (dates[mid]! <= date) {
-      ans = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return ans;
-}
+export { lastIndexAtOrBefore } from "@market/metrics";

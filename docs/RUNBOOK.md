@@ -155,6 +155,7 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **CSV format:** `date,type,ticker,quantity,price,amount,fees,notes` (download the template from the page). Types: buy, sell, dividend, deposit, withdrawal, fee. Quantities and prices as traded; splits are applied automatically. Buys without deposits are fine: cash shortfalls count as deposits.
 - **Imports are all or nothing.** Fix the lines listed and import the file again; nothing is stored until every line passes (including "sells more than held").
 - If a holding shows "valued at cost", its prices are not loaded (add the ticker to `config/universe.json` and backfill).
+- **Risk panel:** volatility, beta, correlation, drawdown length, concentration and daily P&L need only prices; Sharpe and Sortino also need T-bill rates (FRED `DTB3`, loaded when `FRED_ENABLED` is set) and show "No T-bill rates stored" until then. Each measure's method is in the ⓘ next to it. The holdings' correlation table needs two or more holdings with a few weeks of prices.
 - Regenerate the reference fixture after changing a convention: `python3 packages/portfolio/scripts/make_fixture.py`, then `pnpm --filter @market/portfolio test`.
 
 ## Backtests

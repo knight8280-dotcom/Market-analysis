@@ -1,6 +1,6 @@
 {
-  "name": "@market/portfolio",
-  "version": "0.0.0",
+  "name": "@market/metrics",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,9 +10,5 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run"
-  },
-  "dependencies": {
-    "@market/metrics": "workspace:*",
-    "zod": "4.6.5"
   }
 }

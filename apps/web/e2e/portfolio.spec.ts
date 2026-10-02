@@ -7,6 +7,7 @@ const LEDGER = [
   HEADER,
   "2025-01-02,deposit,,,,20000,,Opening deposit",
   "2025-01-03,buy,TEST_DIV,100,32.66,,1.00,",
+  "2025-01-06,buy,TEST_SPLIT4,20,50.00,,1.00,",
   "2025-05-01,dividend,TEST_DIV,,,14.00,,Quarterly dividend",
   "2025-06-02,sell,TEST_DIV,40,29.97,,1.00,",
 ].join("\n");
@@ -54,7 +55,7 @@ test("portfolio: rejected imports change nothing; a CSV import shows holdings an
   });
   await importButton.click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Imported 4 transactions." }),
+    page.getByRole("status").filter({ hasText: "Imported 5 transactions." }),
   ).toBeVisible();
 
   await expect(page.getByTestId("holding-TEST_DIV")).toContainText("60");
@@ -64,6 +65,28 @@ test("portfolio: rejected imports change nothing; a CSV import shows holdings an
   await expect(page.getByTestId("stat-benchmark")).toContainText("TEST_SPLIT4, same period");
   await expect(page.getByText("Net money in").locator("..")).toContainText("$20,000.00");
   await expect(page.getByRole("img", { name: /^Cumulative return\. Portfolio/ })).toBeVisible();
+
+  // Risk (Phase 2 step C2): measures with their method one focus away, and the holdings' links.
+  await expect(page.getByTestId("risk-volatility")).toContainText("%");
+  await expect(page.getByTestId("risk-top10")).toContainText("100.0%");
+  await expect(page.getByTestId("risk-hhi")).toContainText("equal holdings");
+  await expect(page.getByTestId("risk-pnl")).toContainText("$");
+  // Reach the method with the keyboard, as a keyboard user would (Tab onto the button).
+  await page.getByRole("button", { name: "How volatility is measured" }).focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Sample standard deviation of daily time-weighted returns",
+  );
+  await page.keyboard.press("Escape");
+  const matrix = page.getByRole("table", { name: "Correlation of daily returns between holdings" });
+  // Largest holding first, so the order depends on prices; both are there.
+  await expect(matrix.getByRole("columnheader")).toHaveCount(3);
+  await expect(matrix.getByRole("columnheader", { name: "TEST_DIV" })).toBeVisible();
+  await expect(matrix.getByRole("columnheader", { name: "TEST_SPLIT4" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Allocation by asset class" })).toContainText(
+    "Stocks",
+  );
   await expectAccessible(page);
 
   // Manual entry uses the same rules.

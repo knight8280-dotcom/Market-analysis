@@ -103,6 +103,7 @@ export default async function StockLayout({
         ticker={security.ticker}
         valuation={await flagEnabled("valuation")}
         ownership={await flagEnabled("ownership")}
+        news={await flagEnabled("news")}
       />
       {children}
     </div>

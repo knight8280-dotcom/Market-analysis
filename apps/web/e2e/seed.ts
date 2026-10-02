@@ -6,7 +6,7 @@ import { buildStatements, type FactRow } from "@market/market-data/statements";
  * Seeds made-up SEC registrants: TEST_FIN, CIK 0000000042, for the Financials, Valuation and
  * Ownership tabs, and TEST_PEER, CIK 0000000043, its peer by industry code. Synthetic facts
  * (round numbers, not any real company's), synthetic closes for three years up to the latest
- * stored session, and made-up Form 4, 13F and short-interest rows. Runs before the E2E suite;
+ * stored session, and made-up Form 4, 13F, short-interest and news rows. Runs before the E2E suite;
  * safe to re-run. TEST_FIN is the statement builder's unit test scenario, scaled to millions.
  */
 const CIK = "0000000042";
@@ -248,6 +248,7 @@ export async function seedFinancials(databaseUrl: string): Promise<void> {
       await seedPrices(trx, "TEST_FIN", 40);
       await seedPrices(trx, "TEST_PEER", 30);
       await seedOwnership(trx);
+      await seedNews(trx);
     });
   } finally {
     await pool.end();
@@ -556,6 +557,101 @@ async function seedOwnership(trx: Trx) {
         revised, source, fetched_at)
       values (${fin}, ${r.date}, 'TEST_FIN', 'TEST_FIN Synthetic Financials Corp', 'NYSE',
         ${r.si}, ${r.prev}, ${r.adv}, ${r.dtc}, ${r.revised}, 'finra', now())
+    `.execute(trx);
+  }
+}
+
+/**
+ * News for TEST_FIN, relative to today: a press release with a wire copy, a news story, an
+ * exhibit without a headline, and one story older than the tab's 90 days. Made up; links go to
+ * example.invalid.
+ */
+const NEWS: {
+  key: string;
+  source: "sec_edgar" | "finnhub";
+  daysAgo: number;
+  headline: string;
+  described?: boolean;
+  summary: string | null;
+  publisher: string;
+  url: string;
+  copyOf?: string;
+}[] = [
+  {
+    key: "press",
+    source: "sec_edgar",
+    daysAgo: 3,
+    headline: "TEST_FIN Synthetic Financials Corp Reports Fourth Quarter Results",
+    summary:
+      "SPRINGFIELD, Ill. – TEST_FIN Synthetic Financials Corp (TEST: TEST_FIN) today reported made-up results for testing.",
+    publisher: "TEST_FIN Synthetic Financials Corp",
+    url: "https://example.invalid/test-fin/8-k/ex99-1.htm",
+  },
+  {
+    key: "wire",
+    source: "finnhub",
+    daysAgo: 3,
+    headline: "TEST_FIN Synthetic Financials Corp Reports Fourth-Quarter Results",
+    summary: "The same release, carried by a wire service.",
+    publisher: "Example Wire",
+    url: "https://wire.example.invalid/test-fin-results",
+    copyOf: "press",
+  },
+  {
+    key: "story",
+    source: "finnhub",
+    daysAgo: 1,
+    headline: "TEST_FIN opens a made-up research center",
+    summary: "A made-up story for testing the News tab.",
+    publisher: "Example Daily",
+    url: "https://news.example.invalid/test-fin-center",
+  },
+  {
+    key: "deck",
+    source: "sec_edgar",
+    daysAgo: 10,
+    headline:
+      "TEST_FIN Synthetic Financials Corp filed Exhibit 99.1 with a Form 8-K: Regulation FD Disclosure",
+    described: true,
+    summary: null,
+    publisher: "TEST_FIN Synthetic Financials Corp",
+    url: "https://example.invalid/test-fin/8-k/deck.htm",
+  },
+  {
+    key: "old",
+    source: "finnhub",
+    daysAgo: 120,
+    headline: "An old TEST_FIN story outside the tab's window",
+    summary: null,
+    publisher: "Example Daily",
+    url: "https://news.example.invalid/test-fin-old",
+  },
+];
+
+async function seedNews(trx: Trx) {
+  const fin = (
+    await sql<{ security_id: string }>`
+      select security_id from market.securities where ticker = 'TEST_FIN'
+    `.execute(trx)
+  ).rows[0]!.security_id;
+  await sql`delete from market.news_articles where source_id like 'TEST_FIN-%'`.execute(trx);
+  const ids = new Map<string, string>();
+  for (const n of NEWS) {
+    const at = new Date(Date.now() - n.daysAgo * 86_400_000);
+    const row = await sql<{ article_id: string }>`
+      insert into market.news_articles (source, source_id, url, url_key, headline, described,
+        summary, publisher, category, published_at, fetched_at, license_tier, duplicate_of)
+      values (${n.source}, ${`TEST_FIN-${n.key}`}, ${n.url}, ${n.url.replace(/^https:\/\//, "")},
+        ${n.headline}, ${n.described ?? false}, ${n.summary}, ${n.publisher},
+        ${n.source === "sec_edgar" ? "press release" : "company"}, ${at}, ${at},
+        ${n.source === "sec_edgar" ? "public_domain" : "personal_dev"},
+        ${n.copyOf ? ids.get(n.copyOf)! : null})
+      returning article_id
+    `.execute(trx);
+    ids.set(n.key, row.rows[0]!.article_id);
+    await sql`
+      insert into market.news_tickers (article_id, security_id)
+      values (${row.rows[0]!.article_id}, ${fin})
     `.execute(trx);
   }
 }

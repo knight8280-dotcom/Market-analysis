@@ -45,6 +45,12 @@ export const FEATURE_FLAGS = {
       "Insider transactions (Form 4), institutional holders (13F) and short interest on ticker pages, and insider-purchase alerts.",
     default: true,
   },
+  news: {
+    label: "News",
+    description:
+      "Company news and the press releases companies file with SEC, on ticker pages, with model-estimated sentiment when an AI key is set.",
+    default: true,
+  },
   drawings: {
     label: "Chart drawings",
     description:

@@ -99,6 +99,14 @@
   ::after {
     border-color: var(--border);
   }
+  /*
+   * A box that scrolls sideways also clips the screen-reader-only text inside it. That text is
+   * positioned absolutely; without a positioned ancestor here it escapes the box and, laid out
+   * past its edge, widens the whole page on a phone. Utilities that set a position still win.
+   */
+  .overflow-x-auto {
+    position: relative;
+  }
   /* Visible focus for keyboard users (WCAG 2.4.7 / 2.4.13). */
   :focus-visible {
     outline: 2px solid var(--ring);

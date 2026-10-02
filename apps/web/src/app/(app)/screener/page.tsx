@@ -123,7 +123,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams: Sea
         </p>
       </div>
 
-      <div className="grid gap-6 2xl:grid-cols-[18rem_1fr]">
+      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="grid content-start gap-4 sm:grid-cols-2 2xl:grid-cols-1">
           <Card>
             <CardHeader title="Presets" />

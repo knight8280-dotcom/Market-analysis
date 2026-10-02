@@ -93,7 +93,7 @@ export default async function WatchlistsPage({ searchParams }: { searchParams: S
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Watchlists</h1>
-      <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="flex flex-col gap-3">
           <nav aria-label="Watchlists">
             <ul className="flex flex-col gap-1 text-sm">
@@ -103,11 +103,11 @@ export default async function WatchlistsPage({ searchParams }: { searchParams: S
                     href={`/watchlists?id=${l.id}`}
                     aria-current={l.id === selected.id ? "page" : undefined}
                     className={cn(
-                      "flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted",
+                      "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted",
                       l.id === selected.id && "bg-muted font-medium",
                     )}
                   >
-                    {l.name}
+                    <span className="min-w-0 break-words">{l.name}</span>
                     <span className="text-xs text-muted-foreground">{l.count}</span>
                   </Link>
                 </li>

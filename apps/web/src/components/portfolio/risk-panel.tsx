@@ -177,7 +177,7 @@ export function RiskPanel({
           />
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
           <section aria-label="Correlation of holdings" className="flex min-w-0 flex-col gap-2">
             <h3 className="text-sm font-semibold">Correlation of holdings</h3>
             {m && shown.length >= 2 ? (

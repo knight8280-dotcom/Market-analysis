@@ -114,7 +114,7 @@ export function DashboardGrid({
           </div>
         </div>
       ) : null}
-      <div className="grid gap-6 lg:grid-cols-2" data-testid="dashboard">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2" data-testid="dashboard">
         {visible.map((w, i) => {
           const title = WIDGETS[w.id].title;
           return (

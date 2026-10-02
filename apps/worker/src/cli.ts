@@ -14,6 +14,7 @@ import { TiingoProvider } from "@market/market-data/adapters/tiingo";
 import { Redis } from "ioredis";
 import type { JobRequest, WorkerContext } from "./context";
 import { InlineDispatcher } from "./dispatch";
+import { dispatchQueuedBacktests } from "./jobs/backtest";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { runJob } from "./jobs/index";
 import { createLogger } from "./log";
@@ -42,6 +43,8 @@ import { loadUniverse } from "./universe";
  *   earnings [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FINNHUB_API_KEY)
  *   releases [--from YYYY-MM-DD --to YYYY-MM-DD]   (needs FRED_ENABLED)
  *   alerts [--through YYYY-MM-DD]        (emails need RESEND_API_KEY and ALERT_EMAIL_TO)
+ *   backtests                            (runs every queued backtest, one at a time)
+ *   backtest --run 12                    (runs or re-runs one; prints its outcome)
  *   macro [--series DGS10,UNRATE]
  *   monitor [--at 2026-09-29T22:31:00Z]
  *   partitions
@@ -444,6 +447,26 @@ async function main(): Promise<void> {
           ),
         );
         break;
+
+      case "backtests": {
+        const queued = await dispatchQueuedBacktests(ctx);
+        print({ ...queued, ...(await drain()) });
+        break;
+      }
+
+      case "backtest": {
+        const runId = flag("run");
+        if (!runId || !/^[0-9]+$/.test(runId)) throw new Error("backtest needs --run <run id>");
+        // Re-running a finished run puts it back in the queue first (same request, fresh data).
+        await db
+          .updateTable("backtest_runs")
+          .set({ status: "queued", error: null, started_at: null, finished_at: null })
+          .where("run_id", "=", runId)
+          .where("status", "in", ["succeeded", "failed", "cancelled"])
+          .execute();
+        print(await runJob(ctx, JOBS.runBacktest, { runId }));
+        break;
+      }
 
       case "earnings":
       case "releases": {

@@ -1,7 +1,9 @@
 import { loadWorkerEnv } from "@market/config";
 import { createDb, createPool } from "@market/db";
 import { Redis } from "ioredis";
+import { threadRunner } from "./backtest/runner";
 import type { EventSink } from "./context";
+import { dispatchQueuedBacktests } from "./jobs/backtest";
 import { DEFAULT_MACRO_SERIES } from "./jobs/ingest-macro";
 import { createLogger } from "./log";
 import { alertDeliveryFromEnv } from "./mail";
@@ -12,8 +14,9 @@ import { DEFAULT_SCHEDULE, dueJobs } from "./scheduler";
 import { loadUniverse } from "./universe";
 
 /**
- * Long-running worker (spec §3.1): BullMQ workers for every queue plus a 30-second scheduler
- * tick driven by the market calendar. Shuts down gracefully on SIGTERM/SIGINT.
+ * Long-running worker (spec §3.1): BullMQ workers for every queue, a 30-second scheduler tick
+ * driven by the market calendar, and a 3-second poll for backtests the owner queued. Shuts down
+ * gracefully on SIGTERM/SIGINT.
  */
 async function main(): Promise<void> {
   const env = loadWorkerEnv();
@@ -33,10 +36,11 @@ async function main(): Promise<void> {
   };
   const universe = loadUniverse(env.UNIVERSE_FILE);
   const providers = buildProviders(env, { limiterRedis, universe });
+  const db = createDb(pool);
   const runtime = startRuntime(
     {
       appEnv: env.APP_ENV,
-      db: createDb(pool),
+      db,
       providers,
       routes: routingFromEnv(env),
       clock: () => new Date(),
@@ -44,6 +48,7 @@ async function main(): Promise<void> {
       events,
       universe,
       alertDelivery: alertDeliveryFromEnv(env),
+      backtests: threadRunner({ db, databaseUrl: env.DATABASE_URL, log }),
     },
     { connection: () => new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }) },
   );
@@ -62,11 +67,21 @@ async function main(): Promise<void> {
   const timer = setInterval(() => {
     tick().catch((err: unknown) => log.error({ err }, "scheduler tick failed"));
   }, 30_000);
+  const backtestCtx = { db, clock: () => new Date(), dispatch: runtime.dispatcher };
+  let polling = false;
+  const backtestPoll = setInterval(() => {
+    if (polling) return;
+    polling = true;
+    dispatchQueuedBacktests(backtestCtx)
+      .catch((err: unknown) => log.error({ err }, "backtest poll failed"))
+      .finally(() => (polling = false));
+  }, 3_000);
   log.info({ queues: Object.values(QUEUES), providers: [...providers.keys()] }, "worker started");
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");
     clearInterval(timer);
+    clearInterval(backtestPoll);
     await runtime.close();
     limiterRedis.disconnect();
     publisher.disconnect();

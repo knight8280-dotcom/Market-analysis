@@ -8,6 +8,7 @@ import type {
   RoutingEvent,
   RoutingTable,
 } from "@market/market-data";
+import type { BacktestRunner } from "./backtest/runner";
 import type { Logger } from "./log";
 import type { Mailer } from "./mail";
 import type { JobName } from "./queues";
@@ -55,6 +56,8 @@ export interface WorkerContext {
   universe?: Universe;
   /** Alert email delivery; without it alert events are recorded but not emailed. */
   alertDelivery?: AlertDelivery;
+  /** Where backtests run (a worker thread in the worker); in-process when not set. */
+  backtests?: BacktestRunner;
 }
 
 export interface AlertDelivery {

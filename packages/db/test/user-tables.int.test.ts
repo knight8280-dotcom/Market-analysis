@@ -4,14 +4,16 @@ import { createTestDatabase, withRole, type TestDatabase } from "../src/testing"
 import { TEMPLATE } from "./global-setup";
 
 /**
- * Row-level security on the per-user tables (migration 10): a signed-in user sees and changes
- * only their own rows; anonymous clients see nothing; the audit log is read-only to clients.
+ * Row-level security on the per-user tables (migrations 10 and 13): a signed-in user sees and
+ * changes only their own rows; anonymous clients see nothing; the audit log and backtest results
+ * are read-only to clients.
  */
 const ALICE = "00000000-0000-0000-0000-00000000000a";
 const BOB = "00000000-0000-0000-0000-00000000000b";
 
 let t: TestDatabase;
 let securityId: string;
+const runIds = new Map<string, string>();
 
 beforeAll(async () => {
   t = await createTestDatabase(TEMPLATE);
@@ -37,6 +39,22 @@ beforeAll(async () => {
     await t.pool.query(`insert into public.audit_logs (user_id, action) values ($1, 'login')`, [
       user,
     ]);
+    const st = await t.pool.query<{ strategy_id: string }>(
+      `insert into public.strategies (user_id, name, definition) values ($1, 'Trend', '{}')
+       returning strategy_id`,
+      [user],
+    );
+    const run = await t.pool.query<{ run_id: string }>(
+      `insert into public.backtest_runs (user_id, strategy_id, name, kind, request)
+       values ($1, $2, 'Trend', 'single', '{}') returning run_id`,
+      [user, st.rows[0]!.strategy_id],
+    );
+    runIds.set(user, run.rows[0]!.run_id);
+    await t.pool.query(
+      `insert into public.backtest_results (run_id, user_id, summary, report, inputs)
+       values ($1, $2, '{}', '{}', '{}')`,
+      [run.rows[0]!.run_id, user],
+    );
   }
 });
 afterAll(async () => {
@@ -51,7 +69,15 @@ const count = async (c: pg.PoolClient, table: string) =>
 describe("per-user tables", () => {
   it("show a signed-in user only their own rows", async () => {
     await asUser(ALICE, async (c) => {
-      for (const table of ["watchlists", "watchlist_items", "saved_screens", "audit_logs"]) {
+      for (const table of [
+        "watchlists",
+        "watchlist_items",
+        "saved_screens",
+        "audit_logs",
+        "strategies",
+        "backtest_runs",
+        "backtest_results",
+      ]) {
         expect(await count(c, table), table).toBe(1);
       }
       const names = await c.query<{ user_id: string }>("select user_id from public.watchlists");
@@ -92,6 +118,54 @@ describe("per-user tables", () => {
         c.query(`insert into public.audit_logs (user_id, action) values ($1, 'forged')`, [ALICE]),
       ).rejects.toThrow(/permission denied/);
     });
+  });
+
+  it("let a user queue their own backtests but never write results", async () => {
+    await asUser(ALICE, async (c) => {
+      await c.query(
+        `insert into public.backtest_runs (user_id, name, kind, request)
+         values ($1, 'Mine', 'sweep', '{}')`,
+        [ALICE],
+      );
+    });
+    await asUser(ALICE, async (c) => {
+      await expect(
+        c.query(
+          `insert into public.backtest_runs (user_id, name, kind, request)
+           values ($1, 'Forged', 'single', '{}')`,
+          [BOB],
+        ),
+      ).rejects.toThrow(/row-level security/);
+    });
+    await asUser(ALICE, async (c) => {
+      await expect(
+        c.query(
+          `insert into public.backtest_results (run_id, user_id, summary, report, inputs)
+           values ($1, $2, '{}', '{}', '{}')`,
+          [runIds.get(ALICE), ALICE],
+        ),
+      ).rejects.toThrow(/permission denied/);
+    });
+    await asUser(ALICE, async (c) => {
+      await expect(c.query(`update public.backtest_results set summary = '{}'`)).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it("refuse inconsistent run states", async () => {
+    const insert = (status: string, snapshot: string | null = null) =>
+      t.pool.query(
+        `insert into public.backtest_runs (user_id, name, kind, request, status, data_snapshot_id)
+         values ($1, 'State', 'single', '{}', $2, $3)`,
+        [ALICE, status, snapshot],
+      );
+    // Succeeded needs its code version, data fingerprint and finish time; failed, its error.
+    await expect(insert("succeeded")).rejects.toThrow(/check constraint/);
+    await expect(insert("failed")).rejects.toThrow(/check constraint/);
+    await expect(insert("done")).rejects.toThrow(/check constraint/);
+    await expect(insert("queued", "not-a-hash")).rejects.toThrow(/check constraint/);
+    await expect(insert("queued", "a".repeat(64))).resolves.toBeDefined();
   });
 
   it("give anonymous clients nothing", async () => {

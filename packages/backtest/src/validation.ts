@@ -1,21 +1,23 @@
 import type { BacktestData } from "./data";
+import { lastIndexAtOrBefore } from "./data";
 import { BacktestError } from "./engine";
 import { equityMetrics, riskFreeReturns, type EquityMetrics } from "./metrics";
 import { runBacktest, type BacktestReport } from "./report";
+import {
+  combinations,
+  MAX_COMBINATIONS,
+  MAX_RUNS,
+  overfitWarning,
+  walkForwardWindows,
+  type Objective,
+  type WindowDates,
+} from "./request";
 import { describeError, paramNames, resolveStrategy, type Strategy } from "./schema";
 
 /**
  * Validation (Phase 2 step B6; spec §5.15): parameter sweeps, in-sample / out-of-sample splits
  * and walk-forward analysis.
  */
-
-export const OBJECTIVES = ["cagr", "sharpe", "calmar", "total_return"] as const;
-export type Objective = (typeof OBJECTIVES)[number];
-
-/** More combinations than this and the best result is likely overstated: say so. */
-export const OVERFIT_WARNING_AT = 20;
-export const MAX_COMBINATIONS = 400;
-export const MAX_RUNS = 2000;
 
 export interface Summary {
   totalReturn: number;
@@ -32,7 +34,7 @@ export interface SweepRow {
   error: string | null;
 }
 
-const summarize = (r: BacktestReport): Summary => ({
+export const summarize = (r: BacktestReport): Summary => ({
   totalReturn: r.metrics.totalReturn,
   cagr: r.metrics.cagr,
   sharpe: r.metrics.sharpe,
@@ -55,27 +57,18 @@ function score(s: Summary | null, objective: Objective): number | null {
   }
 }
 
-/** Every combination of the listed values, in a fixed order. */
-export function combinations(
-  params: Readonly<Record<string, readonly number[]>>,
-): Record<string, number>[] {
-  let out: Record<string, number>[] = [{}];
-  for (const name of Object.keys(params).sort()) {
-    const values = params[name]!;
-    if (values.length === 0) throw new BacktestError(`no values listed for "${name}"`);
-    out = out.flatMap((c) => values.map((v) => ({ ...c, [name]: v })));
-  }
-  return out;
-}
-
-export function overfitWarning(count: number): string | null {
-  return count > OVERFIT_WARNING_AT
-    ? `${count} parameter combinations were tested. The best of many tries usually looks better than it will do on new data; check it out of sample.`
-    : null;
-}
+const isTimeLimit = (err: unknown) =>
+  err instanceof BacktestError && /time limit/.test(err.message);
 
 function withPeriod(input: unknown, start: string, end: string): unknown {
   return { ...(input as Record<string, unknown>), start, end };
+}
+
+export interface SweepResult {
+  rows: SweepRow[];
+  best: SweepRow | null;
+  combinations: number;
+  warning: string | null;
 }
 
 /** Runs one strategy definition per combination over [start, end]. */
@@ -86,7 +79,7 @@ export function sweep(
   objective: Objective,
   period?: { start: string; end: string },
   deadline?: number,
-): { rows: SweepRow[]; best: SweepRow | null; combinations: number; warning: string | null } {
+): SweepResult {
   const missing = paramNames(input).filter((n) => !(n in params));
   if (missing.length) throw new BacktestError(`no values for parameter ${missing.join(", ")}`);
   const combos = combinations(params);
@@ -103,7 +96,7 @@ export function sweep(
       );
       return { values, summary: summarize(runBacktest(s, data, { deadline })), error: null };
     } catch (err) {
-      if (err instanceof BacktestError && /time limit/.test(err.message)) throw err;
+      if (isTimeLimit(err)) throw err;
       return { values, summary: null, error: describeError(err) };
     }
   });
@@ -140,25 +133,7 @@ export function splitMetrics(
   return { split, inSample: part(0, k), outOfSample: part(Math.max(k - 1, 0), dates.length) };
 }
 
-function addMonths(date: string, months: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth() + months;
-  const target = new Date(Date.UTC(y, m, 1));
-  const lastDay = new Date(
-    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  target.setUTCDate(Math.min(d.getUTCDate(), lastDay));
-  return target.toISOString().slice(0, 10);
-}
-const dayBefore = (date: string) =>
-  new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-
-export interface WalkForwardWindow {
-  trainStart: string;
-  trainEnd: string;
-  testStart: string;
-  testEnd: string;
+export interface WalkForwardWindow extends WindowDates {
   chosen: Record<string, number> | null;
   inSample: Summary | null;
   outOfSample: Summary | null;
@@ -170,13 +145,42 @@ export interface WalkForwardReport {
   dates: string[];
   equity: number[];
   metrics: EquityMetrics | null;
+  /** The benchmark over the same sessions, scaled to the same starting value. */
+  benchmark: { ticker: string; values: (number | null)[]; metrics: EquityMetrics | null } | null;
   combinations: number;
   warning: string | null;
 }
 
+/** Benchmark total-return values on `dates`, scaled to `base` on the first date it has. */
+function benchmarkOn(
+  data: BacktestData,
+  dates: readonly string[],
+  base: number,
+): WalkForwardReport["benchmark"] {
+  const b = data.benchmark;
+  if (!b || dates.length === 0) return null;
+  const raw = dates.map((d) => {
+    const i = lastIndexAtOrBefore(b.dates, d);
+    return i >= 0 ? b.adjClose[i]! : null;
+  });
+  const first = raw.findIndex((v) => v !== null);
+  if (first < 0) return null;
+  const values = raw.map((v) => (v === null ? null : (base * v) / raw[first]!));
+  const ds = dates.slice(first);
+  return {
+    ticker: b.ticker,
+    values,
+    metrics:
+      ds.length >= 2
+        ? equityMetrics(ds, values.slice(first) as number[], riskFreeReturns(ds, data.riskFree))
+        : null,
+  };
+}
+
 /**
  * Walk-forward: choose parameters on each training window, then run them on the following test
- * window; the test windows chained together are the out-of-sample record.
+ * window; the test windows chained together are the out-of-sample record. Each test window
+ * starts in cash with the value the previous one ended with.
  */
 export function walkForward(
   input: unknown,
@@ -187,27 +191,16 @@ export function walkForward(
   testMonths: number,
   deadline?: number,
 ): WalkForwardReport {
-  const base = resolveStrategy(
+  const base: Strategy = resolveStrategy(
     input,
     Object.fromEntries(Object.entries(params).map(([k, v]) => [k, v[0]!])),
   );
-  const windows: WalkForwardWindow[] = [];
-  let trainStart = base.start;
-  for (;;) {
-    const testStart = addMonths(trainStart, trainMonths);
-    if (testStart > base.end) break;
-    const testEnd = [dayBefore(addMonths(testStart, testMonths)), base.end].sort()[0]!;
-    windows.push({
-      trainStart,
-      trainEnd: dayBefore(testStart),
-      testStart,
-      testEnd,
-      chosen: null,
-      inSample: null,
-      outOfSample: null,
-    });
-    trainStart = addMonths(trainStart, testMonths);
-  }
+  const windows: WalkForwardWindow[] = walkForwardWindows(
+    base.start,
+    base.end,
+    trainMonths,
+    testMonths,
+  ).map((w) => ({ ...w, chosen: null, inSample: null, outOfSample: null }));
   if (windows.length === 0) {
     throw new BacktestError("the period is too short for one training window and one test window");
   }
@@ -233,13 +226,10 @@ export function walkForward(
     w.inSample = s.best.summary;
     let test: BacktestReport;
     try {
-      const strategy: Strategy = resolveStrategy(
-        withPeriod(input, w.testStart, w.testEnd),
-        s.best.values,
-      );
+      const strategy = resolveStrategy(withPeriod(input, w.testStart, w.testEnd), s.best.values);
       test = runBacktest(strategy, data, { deadline });
     } catch (err) {
-      if (err instanceof BacktestError && /time limit/.test(err.message)) throw err;
+      if (isTimeLimit(err)) throw err;
       continue;
     }
     w.outOfSample = summarize(test);
@@ -259,6 +249,7 @@ export function walkForward(
       dates.length >= 2
         ? equityMetrics(dates, equity, riskFreeReturns(dates, data.riskFree))
         : null,
+    benchmark: benchmarkOn(data, dates, base.initialCapital),
     combinations: combos,
     warning: overfitWarning(combos),
   };

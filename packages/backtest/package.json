@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
+    "./request": "./src/request.ts",
     "./snapshot": "./src/snapshot.ts"
   },
   "scripts": {

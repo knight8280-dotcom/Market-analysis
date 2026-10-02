@@ -3,6 +3,7 @@ import type { JobsOptions } from "bullmq";
 /** BullMQ queues (spec §3.4 names, plus ingest-macro, maintenance, monitor and the DLQ). */
 export const QUEUES = {
   eod: "ingest-eod",
+  backtest: "backtest-run",
   fundamentals: "ingest-fundamentals",
   filings: "ingest-filings",
   macro: "ingest-macro",
@@ -30,6 +31,7 @@ export const JOBS = {
   ingestEarnings: "ingest-earnings",
   ingestReleases: "ingest-releases",
   evaluateAlerts: "evaluate-alerts",
+  runBacktest: "run-backtest",
 } as const;
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
 
@@ -51,6 +53,7 @@ export const QUEUE_OF: Readonly<Record<JobName, QueueName>> = {
   "ingest-earnings": QUEUES.macro,
   "ingest-releases": QUEUES.macro,
   "evaluate-alerts": QUEUES.maintenance,
+  "run-backtest": QUEUES.backtest,
 };
 
 /**
@@ -73,6 +76,8 @@ export const DEFAULT_JOB_OPTIONS: JobsOptions = {
 
 export const CONCURRENCY: Readonly<Record<QueueName, number>> = {
   "ingest-eod": 4,
+  // CPU-bound, in a worker thread: one at a time.
+  "backtest-run": 1,
   "ingest-fundamentals": 2,
   "ingest-filings": 2,
   "ingest-macro": 1,

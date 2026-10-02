@@ -407,3 +407,68 @@ export function describeError(err: unknown): string {
   }
   return err instanceof Error ? err.message : String(err);
 }
+
+/** Sessions an indicator needs before its first value. */
+function firstValueAfter(o: Extract<Operand, { kind: "indicator" }>): number {
+  const spec: IndicatorSpec = INDICATORS[o.id];
+  const p = (k: string) => o.params[k] ?? spec.params[k]!.default;
+  switch (o.id) {
+    case "sma":
+    case "ema":
+    case "wma":
+    case "bollinger":
+    case "williams_r":
+    case "cci":
+    case "donchian":
+    case "vwap":
+      return p("period");
+    case "rsi":
+    case "atr":
+    case "volatility":
+      return p("period") + 1;
+    case "macd":
+      return p("slow") + p("signal");
+    case "stochastic":
+      return p("kPeriod") + p("kSmoothing") + p("dPeriod");
+    case "adx":
+      return 2 * p("period") + 1;
+    case "keltner":
+      return Math.max(p("period"), p("atrPeriod") + 1);
+    case "obv":
+      return 1;
+  }
+}
+
+/**
+ * The longest history any rule reads back from a session: indicator warm-up plus bars ago, plus
+ * one for crossings (which compare with the session before).
+ */
+export function lookbackSessions(s: Strategy): number {
+  let max = 1;
+  const operand = (o: Operand, extra: number) => {
+    const ago = "barsAgo" in o ? o.barsAgo : 0;
+    const warm = o.kind === "indicator" ? firstValueAfter(o) : 1;
+    max = Math.max(max, warm + ago + extra);
+  };
+  const visit = (r: Rule) => {
+    if ("combine" in r) r.rules.forEach((x) => visit(x));
+    else {
+      const extra = r.op === "crosses_above" || r.op === "crosses_below" ? 1 : 0;
+      operand(r.left, extra);
+      operand(r.right, extra);
+    }
+  };
+  visit(s.entry);
+  if (s.exit) visit(s.exit);
+  if (s.rank) operand(s.rank.by, 0);
+  return max;
+}
+
+/**
+ * Sessions loaded before the start: twice the lookback, so that exponentially smoothed
+ * indicators (EMA, RSI, ATR, ADX) have settled, at least 30 and at most 1,000. Fixed by the
+ * strategy, so the same request always reads the same history.
+ */
+export function warmupSessions(s: Strategy): number {
+  return Math.min(1000, Math.max(30, 2 * lookbackSessions(s)));
+}

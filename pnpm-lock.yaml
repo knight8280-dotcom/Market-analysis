@@ -126,6 +126,9 @@ importers:
       '@market/alerts':
         specifier: workspace:*
         version: link:../../packages/alerts
+      '@market/backtest':
+        specifier: workspace:*
+        version: link:../../packages/backtest
       '@market/calendar':
         specifier: workspace:*
         version: link:../../packages/calendar
@@ -153,6 +156,9 @@ importers:
       pino:
         specifier: 10.3.1
         version: 10.3.1
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
       zod:
         specifier: 4.6.5
         version: 4.6.5

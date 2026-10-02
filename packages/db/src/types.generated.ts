@@ -62,6 +62,32 @@ export interface AuditLogs {
   user_id: string | null;
 }
 
+export interface BacktestResults {
+  created_at: Generated<Timestamp>;
+  inputs: Json;
+  report: Json | null;
+  run_id: Int8;
+  summary: Json;
+  user_id: string;
+  validation: Json | null;
+}
+
+export interface BacktestRuns {
+  code_version: string | null;
+  created_at: Generated<Timestamp>;
+  data_snapshot_id: string | null;
+  error: string | null;
+  finished_at: Timestamp | null;
+  kind: string;
+  name: string;
+  request: Json;
+  run_id: Generated<Int8>;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+  strategy_id: Int8 | null;
+  user_id: string;
+}
+
 export interface MarketAdjustmentFactors {
   computed_at: Generated<Timestamp>;
   dividend_factor: number;
@@ -416,6 +442,15 @@ export interface SavedScreens {
   user_id: string;
 }
 
+export interface Strategies {
+  created_at: Generated<Timestamp>;
+  definition: Json;
+  name: string;
+  strategy_id: Generated<Int8>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface Transactions {
   amount: Numeric | null;
   created_at: Generated<Timestamp>;
@@ -453,6 +488,8 @@ export interface DB {
   alert_events: AlertEvents;
   alerts: Alerts;
   audit_logs: AuditLogs;
+  backtest_results: BacktestResults;
+  backtest_runs: BacktestRuns;
   "market.adjustment_factors": MarketAdjustmentFactors;
   "market.corporate_actions": MarketCorporateActions;
   "market.data_providers": MarketDataProviders;
@@ -478,6 +515,7 @@ export interface DB {
   "ops.provider_health": OpsProviderHealth;
   portfolios: Portfolios;
   saved_screens: SavedScreens;
+  strategies: Strategies;
   transactions: Transactions;
   watchlist_items: WatchlistItems;
   watchlists: Watchlists;

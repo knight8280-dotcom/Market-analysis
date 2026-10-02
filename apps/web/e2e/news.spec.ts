@@ -20,6 +20,15 @@ test("stories newest first, with source, time and links out; copies folded in", 
   await expect(items.nth(0)).toContainText("TEST_FIN opens a made-up research center");
   await expect(items.nth(0)).toContainText("Example Daily");
   await expect(items.nth(0)).toContainText("via Finnhub");
+  await expect(items.nth(0)).toContainText("Model-estimated sentiment: ▲ Positive (+0.40)");
+  await expect(items.nth(1)).toContainText("Model-estimated sentiment: ● Neutral (+0.10)");
+  // Exhibits without a headline are not rated.
+  await expect(items.nth(2)).not.toContainText("Model-estimated sentiment");
+  await items.nth(0).getByRole("link", { name: "What is this?" }).click();
+  await expect(page).toHaveURL(/#about-sentiment$/);
+  await expect(page.getByRole("region", { name: "About model-estimated sentiment" })).toContainText(
+    "Estimates here come from claude-haiku-4-5-20251001 with prompt news-sentiment-v1.",
+  );
 
   const press = items.nth(1);
   await expect(press).toContainText("Press release");

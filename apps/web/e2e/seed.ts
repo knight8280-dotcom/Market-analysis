@@ -576,6 +576,8 @@ const NEWS: {
   publisher: string;
   url: string;
   copyOf?: string;
+  /** A made-up model estimate, in the shape the sentiment job stores. */
+  sentiment?: { label: "negative" | "neutral" | "positive"; score: string };
 }[] = [
   {
     key: "press",
@@ -586,6 +588,7 @@ const NEWS: {
       "SPRINGFIELD, Ill. – TEST_FIN Synthetic Financials Corp (TEST: TEST_FIN) today reported made-up results for testing.",
     publisher: "TEST_FIN Synthetic Financials Corp",
     url: "https://example.invalid/test-fin/8-k/ex99-1.htm",
+    sentiment: { label: "neutral", score: "0.10" },
   },
   {
     key: "wire",
@@ -605,6 +608,7 @@ const NEWS: {
     summary: "A made-up story for testing the News tab.",
     publisher: "Example Daily",
     url: "https://news.example.invalid/test-fin-center",
+    sentiment: { label: "positive", score: "0.40" },
   },
   {
     key: "deck",
@@ -640,12 +644,16 @@ async function seedNews(trx: Trx) {
     const at = new Date(Date.now() - n.daysAgo * 86_400_000);
     const row = await sql<{ article_id: string }>`
       insert into market.news_articles (source, source_id, url, url_key, headline, described,
-        summary, publisher, category, published_at, fetched_at, license_tier, duplicate_of)
+        summary, publisher, category, published_at, fetched_at, license_tier, duplicate_of,
+        sentiment_label, sentiment_score, sentiment_model, sentiment_version, sentiment_at)
       values (${n.source}, ${`TEST_FIN-${n.key}`}, ${n.url}, ${n.url.replace(/^https:\/\//, "")},
         ${n.headline}, ${n.described ?? false}, ${n.summary}, ${n.publisher},
         ${n.source === "sec_edgar" ? "press release" : "company"}, ${at}, ${at},
         ${n.source === "sec_edgar" ? "public_domain" : "personal_dev"},
-        ${n.copyOf ? ids.get(n.copyOf)! : null})
+        ${n.copyOf ? ids.get(n.copyOf)! : null}, ${n.sentiment?.label ?? null},
+        ${n.sentiment?.score ?? null},
+        ${n.sentiment ? "claude-haiku-4-5-20251001" : null},
+        ${n.sentiment ? "news-sentiment-v1" : null}, ${n.sentiment ? at : null})
       returning article_id
     `.execute(trx);
     ids.set(n.key, row.rows[0]!.article_id);

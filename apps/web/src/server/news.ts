@@ -25,6 +25,14 @@ export interface NewsStory extends NewsLink {
   fetchedAt: Date;
   /** The same story elsewhere. */
   copies: NewsLink[];
+  /** Model-estimated tone for the company; null when not rated. */
+  sentiment: {
+    label: "negative" | "neutral" | "positive";
+    score: number;
+    model: string;
+    version: string;
+    at: Date;
+  } | null;
 }
 
 export type NewsFilter = "all" | "press" | "news";
@@ -50,6 +58,11 @@ export async function newsFor(
       "a.url",
       "a.published_at",
       "a.fetched_at",
+      "a.sentiment_label",
+      "a.sentiment_score",
+      "a.sentiment_model",
+      "a.sentiment_version",
+      "a.sentiment_at",
     ])
     .where("t.security_id", "=", securityId)
     .where("a.published_at", ">=", opts.since)
@@ -80,6 +93,11 @@ export async function newsFor(
         "a.url",
         "a.published_at",
         "a.fetched_at",
+        "a.sentiment_label",
+        "a.sentiment_score",
+        "a.sentiment_model",
+        "a.sentiment_version",
+        "a.sentiment_at",
       ])
       .where("a.article_id", "in", missing)
       .execute();
@@ -108,6 +126,20 @@ export async function newsFor(
         publishedAt: a.published_at,
         fetchedAt: a.fetched_at,
         copies: stories.get(a.article_id)?.copies ?? [],
+        sentiment:
+          a.sentiment_label &&
+          a.sentiment_score !== null &&
+          a.sentiment_model &&
+          a.sentiment_version &&
+          a.sentiment_at
+            ? {
+                label: a.sentiment_label as "negative" | "neutral" | "positive",
+                score: Number(a.sentiment_score),
+                model: a.sentiment_model,
+                version: a.sentiment_version,
+                at: a.sentiment_at,
+              }
+            : null,
       });
     }
   }

@@ -163,6 +163,22 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
+  packages/backtest:
+    dependencies:
+      '@market/calendar':
+        specifier: workspace:*
+        version: link:../calendar
+      '@market/indicators':
+        specifier: workspace:*
+        version: link:../indicators
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@market/market-data':
+        specifier: workspace:*
+        version: link:../market-data
+
   packages/calendar: {}
 
   packages/compliance:

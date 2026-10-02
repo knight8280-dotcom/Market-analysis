@@ -1,0 +1,24 @@
+{
+  "name": "@market/backtest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./snapshot": "./src/snapshot.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@market/calendar": "workspace:*",
+    "@market/indicators": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@market/market-data": "workspace:*"
+  }
+}

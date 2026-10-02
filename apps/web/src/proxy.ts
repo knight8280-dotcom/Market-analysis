@@ -2,16 +2,16 @@ import { loadWebEnv, type WebEnv } from "@market/config";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedHost } from "./server/auth/hosts";
 import { safeNext } from "./server/auth/next-path";
+import { isPublicPath } from "./server/auth/public-paths";
 import { SESSION_COOKIE, verifySessionToken } from "./server/auth/session";
 
 /**
  * Guards every route (personal use, ADR-015/018): only the owner, with a valid session cookie,
- * sees anything but the login page. Fails closed: without login configured the app serves
- * nothing. Pages and API routes also check the session themselves (`requireOwner`), so this is
- * not the only line of defence.
+ * sees anything but the login page and what a browser needs to install the app (ADR-037). Fails
+ * closed: without login configured the app serves nothing. Pages and API routes also check the
+ * session themselves (`requireOwner`), so this is not the only line of defence.
  */
 const PRIVATE_HEADERS = { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" };
-const PUBLIC_PATHS = new Set(["/login", "/robots.txt"]);
 
 function withPrivateHeaders(res: NextResponse): NextResponse {
   for (const [k, v] of Object.entries(PRIVATE_HEADERS)) res.headers.set(k, v);
@@ -37,7 +37,7 @@ export function proxy(request: NextRequest): NextResponse {
     passwordHash: env.OWNER_PASSWORD_HASH,
   });
 
-  if (PUBLIC_PATHS.has(pathname)) {
+  if (isPublicPath(pathname)) {
     if (signedIn && pathname === "/login" && request.method === "GET") {
       const to = new URL(safeNext(request.nextUrl.searchParams.get("next")), request.url);
       return withPrivateHeaders(NextResponse.redirect(to));

@@ -13,7 +13,7 @@ import {
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { visibleNav } from "./nav";
+import { visibleNav } from "../lib/nav";
 
 interface Result {
   ticker: string;

@@ -41,6 +41,11 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   {
+    // The service worker runs in the browser's worker scope, not Node.
+    files: ["apps/web/public/sw.js"],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     files: ["**/test/**", "**/*.test.ts", "**/scripts/**"],
     rules: {
       "no-console": "off",

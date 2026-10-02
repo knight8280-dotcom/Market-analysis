@@ -6,7 +6,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BRAND } from "../../brand";
 import { CommandMenu } from "../../components/command-menu";
-import { Nav } from "../../components/nav";
+import { ConnectionStatus } from "../../components/connection-status";
+import { BottomNav, Nav } from "../../components/nav";
 import { NotificationBell } from "../../components/notification-bell";
 import { ThemeToggle } from "../../components/theme-toggle";
 import { unreadNotifications } from "../../server/alerts";
@@ -17,7 +18,10 @@ import { lastUpdated, priceSource, sourceInfo, staleDatasets } from "../../serve
 import { currentTheme } from "../../server/theme";
 import { logout } from "./actions";
 
-/** The signed-in shell: banners, left nav, header with search, and the §12 footer. */
+/**
+ * The signed-in shell: banners, left nav (bottom nav on phones), header with search, and the §12
+ * footer.
+ */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   await requireOwner();
   const env = loadWebEnv();
@@ -43,14 +47,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <StaleDataBanner
         items={stale.map((s) => ({ dataset: s.dataset, since: formatDateTimeET(s.since) }))}
       />
+      <ConnectionStatus />
       <div className="flex min-h-dvh flex-col md:flex-row">
         <aside className="border-b p-3 md:w-56 md:shrink-0 md:border-r md:border-b-0">
-          <Link href="/" className="mb-3 block px-3 py-1 text-base font-semibold">
+          <Link href="/" className="block px-3 py-1 text-base font-semibold md:mb-3">
             {BRAND}
           </Link>
-          <Nav flags={flags} />
+          <div className="hidden md:block">
+            <Nav flags={flags} />
+          </div>
         </aside>
-        <div className="flex min-w-0 flex-1 flex-col">
+        {/* On phones the bottom navigation is fixed over the page: leave room for it. */}
+        <div className="flex min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
           <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2 md:px-6">
             <CommandMenu flags={flags} />
             <p className="text-xs text-muted-foreground" aria-live="polite">
@@ -81,6 +89,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <DisclaimerFooter brand={BRAND} />
         </div>
       </div>
+      <BottomNav flags={flags} />
     </>
   );
 }

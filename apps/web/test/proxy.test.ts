@@ -66,6 +66,25 @@ describe("owner proxy", () => {
     expect(proxy(request("/", { cookie: "v1.e30.AAAA" })).status).toBe(307);
   });
 
+  it("serves what a browser needs to install the app without a session, and nothing more", () => {
+    const open = [
+      "/manifest.webmanifest",
+      "/sw.js",
+      "/icon/32",
+      "/icon/192",
+      "/icon/512",
+      "/apple-icon",
+    ];
+    for (const path of open) {
+      const res = proxy(request(path));
+      expect(res.headers.get("x-middleware-next"), path).toBe("1");
+      expect(res.headers.get("x-robots-tag"), path).toBe("noindex, nofollow");
+    }
+    for (const path of ["/icon/64", "/icon", "/icons/192", "/sw.js/x", "/apple-icon/1"]) {
+      expect(proxy(request(path)).status, path).toBe(307);
+    }
+  });
+
   it("serves the login form, and skips it when already signed in", () => {
     expect(proxy(request("/login")).headers.get("x-middleware-next")).toBe("1");
     const res = proxy(request("/login?next=/screener", { cookie: createSessionToken(keys) }));

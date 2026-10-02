@@ -34,3 +34,13 @@ export const API_ROUTES: Record<string, string> = {
 
 /** Reachable without a session by design. */
 export const PUBLIC_ROUTES = ["/login", "/robots.txt"];
+
+/** What a browser needs to install the app, also public (ADR-037; checked in pwa.spec.ts). */
+export const PUBLIC_ASSETS = [
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/icon/32",
+  "/icon/192",
+  "/icon/512",
+  "/apple-icon",
+];

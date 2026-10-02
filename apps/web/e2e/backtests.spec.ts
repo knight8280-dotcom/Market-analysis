@@ -9,20 +9,24 @@ import { runBacktestsJob } from "./worker";
  */
 test.describe.configure({ mode: "serial" });
 
-const TICKERS = "TEST_DIV, TEST_SPLIT4, TEST_DELIST";
+// Present in every synthetic data set (CI loads one year). The builder's default dates are the
+// stored range, so the tests leave them alone.
+const TICKERS = "TEST_DIV, TEST_SPLIT4, TEST_SPECIAL";
 
 async function fillCommon(page: Page, name: string) {
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Universe").selectOption("tickers");
   await page.getByLabel("Tickers").fill(TICKERS);
-  await page.getByLabel("Start", { exact: true }).fill("2019-01-02");
-  await page.getByLabel("End", { exact: true }).fill("2022-12-30");
 }
 
 async function runQueued(page: Page) {
   await expect(page.getByTestId("run-status")).toHaveText(/Queued|Running/);
   await runBacktestsJob();
-  await expect(page.getByTestId("run-status")).toHaveText("Finished", { timeout: 30_000 });
+  const status = page.getByTestId("run-status");
+  await expect(status).toHaveText(/Finished|Failed/, { timeout: 30_000 });
+  if ((await status.textContent()) === "Failed") {
+    throw new Error(`the run failed: ${await page.getByTestId("run-error").textContent()}`);
+  }
 }
 
 test("a strategy runs in the worker and its report shows results with their assumptions", async ({
@@ -39,6 +43,11 @@ test("a strategy runs in the worker and its report shows results with their assu
 
   await page.getByRole("button", { name: "Trend: 50-day above 200-day average" }).click();
   await fillCommon(page, "E2E trend");
+  // Short averages, so a year of data gives trades.
+  for (const rule of ["Entry rule 1", "Exit rule 1"]) {
+    await page.getByLabel(`${rule}, left: period`).fill("5");
+    await page.getByLabel(`${rule}, right: period`).fill("20");
+  }
   // A bad value is caught before anything is queued.
   await page.getByLabel("Max positions").fill("abc");
   await page.getByRole("button", { name: "Run backtest" }).click();
@@ -48,7 +57,7 @@ test("a strategy runs in the worker and its report shows results with their assu
   await expect(page).toHaveURL(/\/backtests\/new/);
   await page.getByLabel("Max positions").fill("2");
   await expect(page.getByRole("region", { name: "Rules in words" })).toContainText(
-    "SMA(50) > SMA(200)",
+    "SMA(5) > SMA(20)",
   );
   await page.getByRole("button", { name: "Run backtest" }).click();
   await page.waitForURL(/\/backtests\/\d+$/);

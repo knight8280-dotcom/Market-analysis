@@ -141,7 +141,7 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 ## Feature switches
 
 - `/settings` lists the features that ship behind a switch (ADR-024). "Turn off" hides a feature's pages and menu entry and keeps its data; "Use default" removes your override. Overrides are rows in `ops.feature_flags`.
-- Switches after Phase 2a, all on by default: Backtests, Portfolio risk (the risk panel and allocation by asset class; returns and holdings stay), Valuation, More alert types, Notifications, Chart drawings and Customizable dashboard (off shows the standard layout). Phase 2b adds Ownership (the Ownership tab and insider-purchase alerts).
+- Switches after Phase 2a, all on by default: Backtests, Portfolio risk (the risk panel and allocation by asset class; returns and holdings stay), Valuation, More alert types, Notifications, Chart drawings and Customizable dashboard (off shows the standard layout). Phase 2b adds Ownership (the Ownership tab and insider-purchase alerts) and News.
 
 ## Alerts
 
@@ -211,6 +211,16 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **First run:** `pnpm worker short-interest` reads about a year of settlement dates for your listings and prints what it stored and any ticker whose FINRA name does not agree with yours. Then the worker checks daily at 19:30 ET (FINRA publishes about a week after each mid-month and month-end settlement date).
 - **First live run checks the adapter:** the token exchange and query format follow FINRA's documentation and have not yet been tried with a real credential. If the run fails with a response-shape or HTTP 400 error, keep the output (it names the field or status, never the secret) and fix the adapter (`packages/market-data/src/adapters/finra.ts`). Do not commit FINRA responses.
 - Days to cover is FINRA's own figure (short interest ÷ average daily volume). It is left empty when average volume is zero, where FINRA prints 999.99.
+
+## News
+
+- A ticker's **News** tab lists the last 90 days: press releases the company filed with SEC (Exhibit 99 to Form 8-K) and, with a Finnhub key, company news. Each item shows its source, outlet, time and a link out; a story carried by several outlets appears once, with the others under "Also". "Press releases" and "News" filter the list.
+- **Press releases** need EDGAR (as above). The evening filings refresh reads the press release of each new 8-K with exhibits (two SEC requests), and a sweep at 22:45 ET catches any it missed. History: `pnpm worker press-releases --days 365` (`--tickers AAPL,MSFT`, `--limit 500`); it prints how many 8-Ks had a release and how many had none.
+- **An item in italics** is an exhibit without a headline the reader could take (a slide deck, a shareholder letter, tables): it says what was filed instead. If a real release shows this way, its layout is new to the reader: record it as a fixture (`packages/market-data/scripts/record-press-releases.ts`), fix the reader, raise `PRESS_READER_VERSION` in `apps/worker/src/jobs/news.ts` and run the history command to read stored 8-Ks again.
+- **Company news** needs `FINNHUB_API_KEY` (the same free key as the earnings calendar). The worker reads it at 07:00 and 17:00 ET; `pnpm worker news` reads it now (`--tickers`, `--from`, `--to`). The first run reaches back 30 days. **Before relying on it, check the shape once with the real key:** if the run fails with a response-shape error, keep the output (it never includes the key) and fix `packages/market-data/src/adapters/finnhub.ts`. Never commit Finnhub responses.
+- Articles left out (no headline, a link that is not a web page, an impossible time) are listed on the data-health page as `news_item_skipped`.
+- News older than about 13 months is deleted at 03:30 ET. **If you give up the Finnhub key,** Finnhub's terms ask for its data to be deleted: `delete from market.news_articles where source = 'finnhub'; delete from market.earnings_events where source = 'finnhub';`.
+- "News" can be switched off on `/settings`; the data stays stored and is still read.
 
 ## Ownership tab
 

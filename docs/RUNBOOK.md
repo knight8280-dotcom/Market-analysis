@@ -138,6 +138,10 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **.ics export:** "Download .ics" on each calendar tab, signed in. It is a download, not a subscription link, so nothing is reachable without the owner's session; re-import after a refresh (event ids are stable, so calendar apps update rather than duplicate).
 - **Heatmap** (`/heatmap`) reads the screener snapshot (`pnpm worker screener` rebuilds it). Tiles are sized by market cap (SEC shares outstanding × close); securities without shares outstanding are left out and counted, and when none has a market cap (synthetic data) the map sizes by 30-day dollar volume instead.
 
+## Feature switches
+
+- `/settings` lists the features that ship behind a switch (ADR-024). "Turn off" hides a feature's pages and menu entry and keeps its data; "Use default" removes your override. Overrides are rows in `ops.feature_flags`.
+
 ## Alerts
 
 - The worker evaluates alerts at 18:50 ET; to run now: `pnpm worker alerts` (prints what fired and what was emailed). Re-running is safe: nothing fires twice for the same bar.

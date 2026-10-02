@@ -220,3 +220,9 @@ CI also uses `gitleaks/gitleaks-action@v3`, which is free for personal-account r
   - Imports are all-or-nothing: every row is validated (the manual form uses the same rules), tickers must exist, and no sell may exceed the shares held at the time after splits.
 - **Checked:** `scripts/make_fixture.py` computes the same scenario row by row the way a spreadsheet would (two made-up securities, a 2:1 split, FIFO sales across lots, a weekend dividend, implicit deposits, a withdrawal, fees) and writes `test/fixtures/expected.csv`. Every day's cash, value, flow and index and every summary figure match within 0.01%.
 - **Consequences:** returns depend on the owner's entries; wrong trade prices or missing dividends show up directly in the figures. Taxes, currencies other than USD, options and short positions are out of scope.
+
+## ADR-024: Feature flags as code defaults plus database overrides
+
+- **Context:** the spec wants every Phase 2+ feature behind a flag (§10) and suggests a hosted flag service. For one owner running locally, a third-party service adds an account, a network dependency and data leaving the machine, for no benefit.
+- **Decision:** flags are registered in code (`packages/config/src/flags.ts`) with a label, description and default; `ops.feature_flags` holds only the owner's overrides (server-only schema, RLS on). `/settings` turns features on or off and back to their default, audited. A feature that is off has no menu entry and its pages answer 404. A flag is registered when work on its feature starts and defaults to on once the feature is complete.
+- **Consequences:** no new dependency or service; turning a feature off hides it but keeps its data. Flags are read once per request.

@@ -1,5 +1,6 @@
 "use client";
 
+import type { FlagKey } from "@market/config";
 import { Badge, Button, Kbd } from "@market/ui";
 import {
   CommandDialog,
@@ -12,7 +13,7 @@ import {
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { NAV } from "./nav";
+import { visibleNav } from "./nav";
 
 interface Result {
   ticker: string;
@@ -30,7 +31,7 @@ function isTyping(target: EventTarget | null): boolean {
  * Global command palette (spec §6): ⌘K / Ctrl+K or "/" opens it; type a ticker or company name,
  * arrow keys to move, Enter to open. Results come from /api/search.
  */
-export function CommandMenu() {
+export function CommandMenu({ flags }: { flags: Partial<Record<FlagKey, boolean>> }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -122,7 +123,7 @@ export function CommandMenu() {
           ) : null}
           {!query.trim() ? (
             <CommandGroup heading="Go to">
-              {NAV.map(({ href, label, icon: Icon }) => (
+              {visibleNav(flags).map(({ href, label, icon: Icon }) => (
                 <CommandItem key={href} value={`page:${href}`} onSelect={() => go(href)}>
                   <Icon aria-hidden className="size-4 text-muted-foreground" />
                   {label}

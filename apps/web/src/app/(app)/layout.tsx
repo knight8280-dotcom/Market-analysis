@@ -10,6 +10,7 @@ import { Nav } from "../../components/nav";
 import { ThemeToggle } from "../../components/theme-toggle";
 import { requireOwner } from "../../server/auth/owner";
 import { db } from "../../server/db";
+import { enabledFlags } from "../../server/flags";
 import { lastUpdated, priceSource, sourceInfo, staleDatasets } from "../../server/market";
 import { currentTheme } from "../../server/theme";
 import { logout } from "./actions";
@@ -20,10 +21,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const env = loadWebEnv();
   const database = db();
   const source = await priceSource(database);
-  const [updated, stale, theme] = await Promise.all([
+  const [updated, stale, theme, flags] = await Promise.all([
     source ? lastUpdated(database, source) : null,
     staleDatasets(database),
     currentTheme(),
+    enabledFlags(),
   ]);
 
   return (
@@ -43,11 +45,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/" className="mb-3 block px-3 py-1 text-base font-semibold">
             {BRAND}
           </Link>
-          <Nav />
+          <Nav flags={flags} />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center gap-3 border-b px-4 py-2 md:px-6">
-            <CommandMenu />
+            <CommandMenu flags={flags} />
             <p className="text-xs text-muted-foreground" aria-live="polite">
               {updated?.session ? (
                 <>

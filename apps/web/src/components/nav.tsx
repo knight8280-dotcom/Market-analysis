@@ -1,5 +1,6 @@
 "use client";
 
+import type { FlagKey } from "@market/config";
 import { cn } from "@market/ui";
 import {
   Activity,
@@ -11,12 +12,21 @@ import {
   LayoutDashboard,
   ListChecks,
   type LucideIcon,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/** Left navigation (spec §6). Sections are added here as each Phase 1 group ships. */
-export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** Shown only while this feature flag is on. */
+  flag?: FlagKey;
+}
+
+/** Left navigation (spec §6). Sections are added as features ship; flagged ones can be hidden. */
+export const NAV: NavItem[] = [
   { href: "/", label: "Markets", icon: LayoutDashboard },
   { href: "/screener", label: "Screener", icon: Filter },
   { href: "/watchlists", label: "Watchlists", icon: ListChecks },
@@ -25,7 +35,13 @@ export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/heatmap", label: "Heatmap", icon: Grid2x2 },
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/admin/data-health", label: "Data health", icon: Activity },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+/** The entries to show, given the current feature flags. */
+export function visibleNav(flags: Partial<Record<FlagKey, boolean>>): NavItem[] {
+  return NAV.filter((item) => !item.flag || flags[item.flag] === true);
+}
 
 export function isActive(pathname: string, href: string): boolean {
   return href === "/"
@@ -33,11 +49,14 @@ export function isActive(pathname: string, href: string): boolean {
     : pathname.startsWith(href);
 }
 
-export function Nav() {
+export function Nav({ flags }: { flags: Partial<Record<FlagKey, boolean>> }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main" className="flex gap-1 md:flex-col">
-      {NAV.map(({ href, label, icon: Icon }) => {
+    <nav
+      aria-label="Main"
+      className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:flex-col md:px-0"
+    >
+      {visibleNav(flags).map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link
@@ -45,7 +64,7 @@ export function Nav() {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-h-9 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground",
+              "flex min-h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm whitespace-nowrap text-muted-foreground hover:bg-muted hover:text-foreground",
               active && "bg-muted font-medium text-foreground",
             )}
           >

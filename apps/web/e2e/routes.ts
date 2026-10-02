@@ -10,6 +10,7 @@ export const PAGE_ROUTES: Record<string, string> = {
   "/heatmap": "/heatmap",
   "/portfolio": "/portfolio",
   "/screener": "/screener",
+  "/settings": "/settings",
   "/stocks/[ticker]": "/stocks/TEST_DIV",
   "/stocks/[ticker]/financials": "/stocks/TEST_FIN/financials",
   "/watchlists": "/watchlists",

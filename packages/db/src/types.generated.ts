@@ -377,6 +377,12 @@ export interface OpsDatasetRouting {
   updated_at: Generated<Timestamp>;
 }
 
+export interface OpsFeatureFlags {
+  enabled: boolean;
+  key: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface OpsProviderHealth {
   consecutive_failures: Generated<number>;
   consecutive_successes: Generated<number>;
@@ -468,6 +474,7 @@ export interface DB {
   "ops.data_ingestion_runs": OpsDataIngestionRuns;
   "ops.data_quality_issues": OpsDataQualityIssues;
   "ops.dataset_routing": OpsDatasetRouting;
+  "ops.feature_flags": OpsFeatureFlags;
   "ops.provider_health": OpsProviderHealth;
   portfolios: Portfolios;
   saved_screens: SavedScreens;

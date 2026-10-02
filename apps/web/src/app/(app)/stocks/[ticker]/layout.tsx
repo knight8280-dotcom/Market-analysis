@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: tickerOf((await params).ticker) };
 }
 
-/** Ticker header (latest bar, change, source and as-of) and the Chart / Financials tabs. */
+/** Ticker header (latest bar, change, source and as-of) and the ticker page tabs. */
 export default async function StockLayout({
   children,
   params,
@@ -99,7 +99,11 @@ export default async function StockLayout({
           <p className="text-sm text-muted-foreground">No prices for this security yet.</p>
         )}
       </header>
-      <StockTabs ticker={security.ticker} valuation={await flagEnabled("valuation")} />
+      <StockTabs
+        ticker={security.ticker}
+        valuation={await flagEnabled("valuation")}
+        ownership={await flagEnabled("ownership")}
+      />
       {children}
     </div>
   );

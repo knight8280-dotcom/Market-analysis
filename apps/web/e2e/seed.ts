@@ -3,11 +3,11 @@ import { createDb, createPool, sql, type Database } from "@market/db";
 import { buildStatements, type FactRow } from "@market/market-data/statements";
 
 /**
- * Seeds made-up SEC registrants: TEST_FIN, CIK 0000000042, for the Financials and Valuation
- * tabs, and TEST_PEER, CIK 0000000043, its peer by industry code. Synthetic facts (round
- * numbers, not any real company's) and synthetic closes for three years up to the latest stored
- * session. Runs before the E2E suite; safe to re-run. TEST_FIN is the statement builder's unit
- * test scenario, scaled to millions.
+ * Seeds made-up SEC registrants: TEST_FIN, CIK 0000000042, for the Financials, Valuation and
+ * Ownership tabs, and TEST_PEER, CIK 0000000043, its peer by industry code. Synthetic facts
+ * (round numbers, not any real company's), synthetic closes for three years up to the latest
+ * stored session, and made-up Form 4, 13F and short-interest rows. Runs before the E2E suite;
+ * safe to re-run. TEST_FIN is the statement builder's unit test scenario, scaled to millions.
  */
 const CIK = "0000000042";
 const PRETAX =
@@ -247,8 +247,315 @@ export async function seedFinancials(databaseUrl: string): Promise<void> {
       );
       await seedPrices(trx, "TEST_FIN", 40);
       await seedPrices(trx, "TEST_PEER", 30);
+      await seedOwnership(trx);
     });
   } finally {
     await pool.end();
+  }
+}
+
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+
+const owner = (cik: string, name: string, role: Record<string, unknown>) => ({
+  cik,
+  name,
+  is_director: false,
+  is_officer: false,
+  officer_title: null,
+  is_ten_percent_owner: false,
+  is_other: false,
+  other_text: null,
+  ...role,
+});
+const ONE = owner("0000000901", "TEST INSIDER ONE", { is_director: true });
+const TWO = owner("0000000902", "TEST INSIDER TWO", {
+  is_officer: true,
+  officer_title: "Chief Executive Officer",
+});
+const THREE = owner("0000000903", "TEST INSIDER THREE", { is_ten_percent_owner: true });
+const AVERAGE = { F1: "The price is a weighted average of purchases from $41.25 to $41.75." };
+
+interface SeedLine {
+  derivative?: boolean;
+  title?: string;
+  daysAgo: number;
+  code: string;
+  shares: number;
+  price: number | null;
+  ad: "A" | "D";
+  after: number;
+  indirect?: string;
+  notes?: string[];
+}
+
+/**
+ * Form 4s, relative to today: purchases by three insiders within three weeks, a sale under a
+ * 10b5-1 plan and an amendment that repeats a purchase (left out of totals).
+ */
+const FORM4: {
+  accession: string;
+  form: "4" | "4/A";
+  filedDaysAgo: number;
+  owners: ReturnType<typeof owner>[];
+  plan: boolean | null;
+  footnotes?: Record<string, string>;
+  original?: number;
+  lines: SeedLine[];
+}[] = [
+  {
+    accession: "0000000042-26-000201",
+    form: "4",
+    filedDaysAgo: 20,
+    owners: [ONE],
+    plan: false,
+    lines: [
+      { daysAgo: 21, code: "P", shares: 1000, price: 40, ad: "A", after: 5000 },
+      {
+        derivative: true,
+        title: "Stock Option (right to buy)",
+        daysAgo: 21,
+        code: "A",
+        shares: 5000,
+        price: null,
+        ad: "A",
+        after: 5000,
+      },
+    ],
+  },
+  {
+    accession: "0000000042-26-000202",
+    form: "4",
+    filedDaysAgo: 14,
+    owners: [TWO],
+    plan: false,
+    footnotes: AVERAGE,
+    lines: [
+      { daysAgo: 15, code: "P", shares: 2000, price: 41.5, ad: "A", after: 12000, notes: ["F1"] },
+    ],
+  },
+  {
+    accession: "0000000042-26-000203",
+    form: "4",
+    filedDaysAgo: 9,
+    owners: [THREE],
+    plan: false,
+    lines: [
+      {
+        daysAgo: 10,
+        code: "P",
+        shares: 500,
+        price: 42,
+        ad: "A",
+        after: 80500,
+        indirect: "By TEST Holdings LLC",
+      },
+    ],
+  },
+  {
+    accession: "0000000042-26-000204",
+    form: "4",
+    filedDaysAgo: 4,
+    owners: [TWO],
+    plan: true,
+    lines: [{ daysAgo: 5, code: "S", shares: 300, price: 43, ad: "D", after: 11700 }],
+  },
+  {
+    accession: "0000000042-26-000205",
+    form: "4/A",
+    filedDaysAgo: 3,
+    owners: [TWO],
+    plan: false,
+    footnotes: AVERAGE,
+    original: 14,
+    lines: [
+      { daysAgo: 15, code: "P", shares: 2000, price: 41.5, ad: "A", after: 12000, notes: ["F1"] },
+    ],
+  },
+];
+
+/**
+ * 13F: two quarters of made-up managers' positions in TEST_FIN. The data set names follow SEC's
+ * pattern with windows SEC never uses (its sets run Dec-Feb, Mar-May, Jun-Aug and Sep-Nov), so
+ * they cannot be mistaken for real ones.
+ */
+const DATA_SETS = [
+  { name: "01apr2025-30jun2025_form13f.zip", start: "2025-04-01", end: "2025-06-30" },
+  { name: "01jul2025-30sep2025_form13f.zip", start: "2025-07-01", end: "2025-09-30" },
+] as const;
+const FORM13F: {
+  accession: string;
+  cik: string;
+  name: string;
+  period: string;
+  filed: string;
+  set: 0 | 1;
+  shares: number | null;
+  value: number | null;
+}[] = [
+  {
+    accession: "0000000911-25-000001",
+    cik: "0000000911",
+    name: "TEST Capital Management LP",
+    period: "2025-03-31",
+    filed: "2025-05-14",
+    set: 0,
+    shares: 100_000,
+    value: 4_000_000,
+  },
+  {
+    accession: "0000000912-25-000001",
+    cik: "0000000912",
+    name: "TEST Index Advisors LLC",
+    period: "2025-03-31",
+    filed: "2025-05-13",
+    set: 0,
+    shares: 250_000,
+    value: 10_000_000,
+  },
+  {
+    accession: "0000000914-25-000001",
+    cik: "0000000914",
+    name: "TEST Former Holder Inc",
+    period: "2025-03-31",
+    filed: "2025-05-12",
+    set: 0,
+    shares: 60_000,
+    value: 2_400_000,
+  },
+  {
+    accession: "0000000911-25-000002",
+    cik: "0000000911",
+    name: "TEST Capital Management LP",
+    period: "2025-06-30",
+    filed: "2025-08-14",
+    set: 1,
+    shares: 150_000,
+    value: 6_300_000,
+  },
+  {
+    accession: "0000000912-25-000002",
+    cik: "0000000912",
+    name: "TEST Index Advisors LLC",
+    period: "2025-06-30",
+    filed: "2025-08-13",
+    set: 1,
+    shares: 250_000,
+    value: 10_500_000,
+  },
+  {
+    accession: "0000000913-25-000001",
+    cik: "0000000913",
+    name: "TEST Growth Partners",
+    period: "2025-06-30",
+    filed: "2025-08-12",
+    set: 1,
+    shares: 40_000,
+    value: 1_680_000,
+  },
+  // Files for the quarter without TEST_FIN: listed last quarter, not this one.
+  {
+    accession: "0000000914-25-000002",
+    cik: "0000000914",
+    name: "TEST Former Holder Inc",
+    period: "2025-06-30",
+    filed: "2025-08-12",
+    set: 1,
+    shares: null,
+    value: null,
+  },
+];
+
+/** Short interest: made-up figures in FINRA's shape (FINRA's own data is never committed). */
+const SHORT_INTEREST = [
+  { date: "2026-09-15", si: 1_200_000, prev: 1_000_000, adv: 400_000, dtc: "3", revised: false },
+  { date: "2026-08-29", si: 1_000_000, prev: 950_000, adv: 500_000, dtc: "2", revised: true },
+  { date: "2026-08-15", si: 950_000, prev: 900_000, adv: 0, dtc: null, revised: false },
+];
+
+async function seedOwnership(trx: Trx) {
+  const fin = (
+    await sql<{ security_id: string }>`
+      select security_id from market.securities where ticker = 'TEST_FIN'
+    `.execute(trx)
+  ).rows[0]!.security_id;
+
+  await sql`delete from market.insider_filings where issuer_cik = ${CIK}`.execute(trx);
+  for (const f of FORM4) {
+    const filedAt = `${daysAgo(f.filedDaysAgo)}T21:30:00Z`;
+    await sql`
+      insert into market.insider_filings (accession_no, issuer_cik, issuer_name, issuer_symbol,
+        form_type, filed_at, period_of_report, original_filing_date, owners, aff_10b5_1,
+        footnotes, url, source, fetched_at, parser_version)
+      values (${f.accession}, ${CIK}, 'TEST_FIN Synthetic Financials Corp', 'TEST_FIN',
+        ${f.form}, ${filedAt}, ${daysAgo(Math.max(...f.lines.map((l) => l.daysAgo)))},
+        ${f.original === undefined ? null : daysAgo(f.original)}, ${JSON.stringify(f.owners)},
+        ${f.plan}, ${JSON.stringify(f.footnotes ?? {})},
+        ${`https://example.invalid/test-fin/form4/${f.accession}`}, 'sec_edgar', ${filedAt}, 1)
+    `.execute(trx);
+    for (const [i, l] of f.lines.entries()) {
+      await sql`
+        insert into market.insider_transactions (accession_no, line, derivative, security_title,
+          transaction_date, code, shares, price, acquired_disposed, shares_after, ownership,
+          ownership_nature, footnote_ids)
+        values (${f.accession}, ${i + 1}, ${l.derivative ?? false},
+          ${l.title ?? "Common Stock"}, ${daysAgo(l.daysAgo)}, ${l.code}, ${l.shares}, ${l.price},
+          ${l.ad}, ${l.after}, ${l.indirect ? "I" : "D"}, ${l.indirect ?? null},
+          ${l.notes ?? []})
+      `.execute(trx);
+    }
+  }
+
+  for (const d of DATA_SETS) {
+    await sql`delete from market.form13f_data_sets where name = ${d.name}`.execute(trx);
+  }
+  await sql`delete from market.institutional_holdings where security_id = ${fin}`.execute(trx);
+  await sql`delete from market.security_cusips where security_id = ${fin}`.execute(trx);
+  await sql`
+    insert into market.security_cusips (cusip, security_id, symbol, description, first_seen,
+      last_seen)
+    values ('TESTFIN01', ${fin}, 'TEST_FIN', 'TEST_FIN SYNTHETIC FINANCIALS', '2025-01-02',
+      '2025-09-30')
+  `.execute(trx);
+  for (const [i, d] of DATA_SETS.entries()) {
+    const filings = FORM13F.filter((f) => f.set === i);
+    await sql`
+      insert into market.form13f_data_sets (name, url, window_start, window_end, ingested_at,
+        filings, holdings, infotable_rows)
+      values (${d.name}, ${`https://example.invalid/test-13f/${d.name}`}, ${d.start}, ${d.end},
+        now(), ${filings.length}, ${filings.filter((f) => f.shares !== null).length},
+        ${filings.filter((f) => f.shares !== null).length})
+    `.execute(trx);
+  }
+  for (const f of FORM13F) {
+    await sql`
+      insert into market.form13f_filings (accession_no, filer_cik, filer_name, submission_type,
+        report_type, report_period, filed_on, table_entry_total, table_value_total, data_set)
+      values (${f.accession}, ${f.cik}, ${f.name}, '13F-HR', '13F HOLDINGS REPORT', ${f.period},
+        ${f.filed}, ${f.shares === null ? 0 : 1}, ${f.value ?? 0},
+        ${DATA_SETS[f.set].name})
+    `.execute(trx);
+    if (f.shares === null) continue;
+    await sql`
+      insert into market.form13f_holdings (accession_no, security_id, cusip, shares, value_usd,
+        rows)
+      values (${f.accession}, ${fin}, 'TESTFIN01', ${f.shares}, ${f.value}, 1)
+    `.execute(trx);
+    await sql`
+      insert into market.institutional_holdings (security_id, report_period, filer_cik,
+        filer_name, shares, value_usd, filed_on, accession_nos)
+      values (${fin}, ${f.period}, ${f.cik}, ${f.name}, ${f.shares}, ${f.value}, ${f.filed},
+        ${[f.accession]})
+    `.execute(trx);
+  }
+
+  await sql`delete from market.short_interest where security_id = ${fin}`.execute(trx);
+  for (const r of SHORT_INTEREST) {
+    await sql`
+      insert into market.short_interest (security_id, settlement_date, symbol, issue_name,
+        market_class, short_interest, previous_short_interest, avg_daily_volume, days_to_cover,
+        revised, source, fetched_at)
+      values (${fin}, ${r.date}, 'TEST_FIN', 'TEST_FIN Synthetic Financials Corp', 'NYSE',
+        ${r.si}, ${r.prev}, ${r.adv}, ${r.dtc}, ${r.revised}, 'finra', now())
+    `.execute(trx);
   }
 }

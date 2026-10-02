@@ -27,6 +27,7 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 const ERRORS: Record<string, string> = {
   ticker: "No security with that ticker is loaded.",
+  cik: "That security has no SEC CIK, so its Form 4 filings cannot be matched to it.",
   screen: "Pick one of your saved screens.",
   cooldown: "The cooldown must be between 0 and 720 hours.",
 };
@@ -83,6 +84,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
             ticker={one("ticker")}
             kind={kind}
             moreKinds={flags.alert_types}
+            ownership={flags.ownership}
             screens={screens.map((s) => ({ id: s.id, name: s.name }))}
           />
           {error ? (

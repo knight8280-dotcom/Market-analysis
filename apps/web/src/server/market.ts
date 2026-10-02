@@ -14,6 +14,7 @@ const NAMES: Partial<Record<ProviderId, string>> = {
   fred: "FRED",
   finnhub: "Finnhub",
   treasury: "U.S. Treasury",
+  finra: "FINRA",
 };
 
 export interface SourceInfo {

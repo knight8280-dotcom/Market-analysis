@@ -16,6 +16,21 @@ describe("delay labels (spec §12)", () => {
     expect(COPY.delay("delayed")).toBe("Delayed 15 min");
     expect(COPY.delay("realtime")).toBe("Real-time");
     expect(COPY.delay("filing", "2025-10-31")).toBe("As filed, Oct 31, 2025");
+    expect(COPY.delay("settlement", "2026-09-15")).toBe("Settlement date Sep 15, 2026");
+  });
+});
+
+describe("ownership copy (spec §2.5, §5.13)", () => {
+  it("labels 13F data with its quarter end and filing date, as the spec words it", () => {
+    expect(COPY.thirteenF("2026-06-30", "2026-08-14")).toBe(
+      "As of quarter end Jun 30, 2026, filed Aug 14, 2026; 13F data is reported up to 45 days after quarter end.",
+    );
+    expect(COPY.thirteenF("2026-06-30", "2026-07-02", "2026-08-14")).toBe(
+      "As of quarter end Jun 30, 2026, filed Jul 2, 2026 to Aug 14, 2026; 13F data is reported up to 45 days after quarter end.",
+    );
+  });
+  it("gives short interest its settlement date", () => {
+    expect(COPY.shortInterest("2026-09-15")).toMatch(/^Settlement date Sep 15, 2026\. /);
   });
 });
 

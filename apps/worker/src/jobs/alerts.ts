@@ -3,6 +3,7 @@ import {
   describeAlert,
   evaluateAlert,
   parseAlert,
+  OWNERSHIP_KINDS,
   parseState,
   PHASE2_KINDS,
   screenFingerprint,
@@ -12,6 +13,7 @@ import {
   type DailySeries,
   type Evaluation,
   type FilingItem,
+  type InsiderPurchaseFiling,
   type LatestBar,
   type ScreenResults,
   type UpcomingEarnings,
@@ -20,6 +22,7 @@ import { marketDateOf } from "@market/calendar";
 import { OWNER_USER_ID, resolveFlags } from "@market/config";
 import { sql } from "@market/db";
 import { licenseFor, ProviderId } from "@market/market-data";
+import { ownersLabel, roleOf, type OwnerLike } from "@market/ownership";
 import { Screen, screenMembers } from "@market/screener";
 import { z } from "zod";
 import type { WorkerContext } from "../context";
@@ -30,7 +33,7 @@ import { routeFor } from "../routing";
 const DEFAULT_APP_URL = "http://localhost:3000";
 /** Calendar days of adjusted bars for indicator and volume conditions (about 550 sessions). */
 const SERIES_DAYS = 800;
-const TRIGGERS = ["schedule", "bars", "filings", "screener", "manual"] as const;
+const TRIGGERS = ["schedule", "bars", "filings", "insiders", "screener", "manual"] as const;
 type Trigger = (typeof TRIGGERS)[number];
 
 const Input = z.object({
@@ -69,6 +72,8 @@ interface AlertRow {
 }
 
 const isPhase2 = (kind: AlertKind) => (PHASE2_KINDS as readonly AlertKind[]).includes(kind);
+const needsOwnership = (kind: AlertKind) =>
+  (OWNERSHIP_KINDS as readonly AlertKind[]).includes(kind);
 
 /** Notification links: a path in the app or a filing on www.sec.gov (the table checks it too). */
 function safeHref(href: string | null): string | null {
@@ -160,7 +165,10 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
         outcome.invalid++;
         continue;
       }
-      if (isPhase2(def.kind) && !flags.alert_types) {
+      if (
+        (isPhase2(def.kind) && !flags.alert_types) ||
+        (needsOwnership(def.kind) && !flags.ownership)
+      ) {
         outcome.disabled++;
         continue;
       }
@@ -176,6 +184,10 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
             ? await storedFilings(ctx, r.cik, r.created_at, state.filingsSeenThrough)
             : null,
         screen: def.kind === "screen_membership" ? await screenResults(ctx, r, screens) : null,
+        insiderPurchases:
+          def.kind === "insider_purchase" && r.cik
+            ? await insiderPurchases(ctx, r.cik, r.created_at, state.insidersSeenThrough)
+            : null,
         today,
         now,
         lastFiredAt: r.last_fired_at,
@@ -303,6 +315,8 @@ function sourceLine(
       return "Earnings dates: Finnhub (personal use).";
     case "new_filing":
       return "Filings: SEC EDGAR (public domain).";
+    case "insider_purchase":
+      return "Insider transactions: Form 4 filings, SEC EDGAR (public domain).";
     case "screen_membership":
       return `Screener snapshot as of ${result.date}, built from end-of-day data. ${attribution}.`;
     default:
@@ -469,6 +483,55 @@ async function storedFilings(
     filingDate: f.filing_date,
     url: f.url,
     storedAt: f.ingested_at,
+  }));
+}
+
+/**
+ * Form 4s (not amendments) for the company, accepted after the alert was created and read after
+ * it last looked, that report at least one open-market purchase (code P, Table I, acquired).
+ */
+async function insiderPurchases(
+  ctx: WorkerContext,
+  cik: string,
+  createdAt: Date,
+  seenThrough: string | undefined,
+): Promise<InsiderPurchaseFiling[]> {
+  const rows = await sql<{
+    accession_no: string;
+    filed_at: Date;
+    filing_date: string | null;
+    url: string;
+    fetched_at: Date;
+    owners: OwnerLike[];
+    lines: { date: string; shares: string | null; price: string | null }[];
+  }>`
+    select f.accession_no, f.filed_at, f.url, f.fetched_at, f.owners,
+      (select fl.filing_date from market.filings fl where fl.accession_no = f.accession_no limit 1)
+        as filing_date,
+      json_agg(json_build_object('date', t.transaction_date, 'shares', t.shares, 'price', t.price)
+               order by t.line) as lines
+    from market.insider_filings f
+    join market.insider_transactions t on t.accession_no = f.accession_no
+    where f.issuer_cik = ${cik} and f.form_type = '4' and f.filed_at > ${createdAt}
+      and f.fetched_at > ${seenThrough ?? "-infinity"}::timestamptz
+      and t.code = 'P' and not t.derivative and t.acquired_disposed = 'A'
+    group by f.accession_no
+    order by f.fetched_at, f.accession_no
+    limit 200
+  `.execute(ctx.db);
+  return rows.rows.map((f) => ({
+    accessionNo: f.accession_no,
+    filedAt: f.filed_at,
+    filingDate: f.filing_date ?? marketDateOf(f.filed_at),
+    url: f.url,
+    storedAt: f.fetched_at,
+    insider: ownersLabel(f.owners),
+    role: f.owners[0] ? roleOf(f.owners[0]) : "Reporting person",
+    lines: f.lines.map((l) => ({
+      date: l.date,
+      shares: l.shares === null ? null : Number(l.shares),
+      price: l.price === null ? null : Number(l.price),
+    })),
   }));
 }
 

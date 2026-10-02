@@ -4,15 +4,30 @@ import { cn } from "@market/ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function StockTabs({ ticker, valuation }: { ticker: string; valuation: boolean }) {
+export function StockTabs({
+  ticker,
+  valuation,
+  ownership,
+}: {
+  ticker: string;
+  valuation: boolean;
+  ownership: boolean;
+}) {
   const pathname = usePathname();
   const base = `/stocks/${encodeURIComponent(ticker)}`;
   const on = (tab: string) => pathname.endsWith(`/${tab}`);
   const tabs = [
-    { href: base, label: "Chart", active: !on("financials") && !on("valuation") },
+    {
+      href: base,
+      label: "Chart",
+      active: !on("financials") && !on("valuation") && !on("ownership"),
+    },
     { href: `${base}/financials`, label: "Financials", active: on("financials") },
     ...(valuation
       ? [{ href: `${base}/valuation`, label: "Valuation", active: on("valuation") }]
+      : []),
+    ...(ownership
+      ? [{ href: `${base}/ownership`, label: "Ownership", active: on("ownership") }]
       : []),
   ];
   return (

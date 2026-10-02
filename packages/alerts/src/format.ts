@@ -104,6 +104,10 @@ export function describeAlert(def: AlertDefinition, context: { screenName?: stri
       return `Volume at least ${plain(def.params.multiple)}× its ${def.params.lookback}-day average`;
     case "new_filing":
       return `New filing: ${def.params.forms.map(formName).join(", ")}${def.params.amendments ? " (amendments too)" : ""}`;
+    case "insider_purchase":
+      return def.params.minValue > 0
+        ? `An insider buys at least ${money(def.params.minValue).replace(/\.00$/, "")} on the open market (Form 4)`
+        : "An insider buys on the open market (Form 4)";
     case "screen_membership": {
       const screen = context.screenName ? `“${context.screenName}”` : "the screen";
       return `A security ${CHANGE[def.params.change]} ${screen}`;

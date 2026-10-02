@@ -2,6 +2,7 @@
 
 import {
   CooldownHours,
+  OWNERSHIP_KINDS,
   PHASE2_KINDS,
   screenFingerprint,
   SNOOZE_HOURS,
@@ -40,7 +41,14 @@ export async function createAlert(form: FormData): Promise<void> {
       ...(ticker ? { ticker } : {}),
     });
   const phase2 = (PHASE2_KINDS as readonly AlertKind[]).includes(kind as AlertKind);
-  if (!isAlertKind(kind) || (phase2 && !(await flagEnabled("alert_types")))) fail("condition");
+  const ownership = (OWNERSHIP_KINDS as readonly AlertKind[]).includes(kind as AlertKind);
+  if (
+    !isAlertKind(kind) ||
+    (phase2 && !(await flagEnabled("alert_types"))) ||
+    (ownership && !(await flagEnabled("ownership")))
+  ) {
+    fail("condition");
+  }
   const def = definitionFrom(form) ?? fail("condition");
   const cooldown = CooldownHours.safeParse(Number(text(form, "cooldown") || Number.NaN));
   if (!cooldown.success) fail("cooldown");
@@ -67,6 +75,8 @@ export async function createAlert(form: FormData): Promise<void> {
   } else {
     const security = ticker ? await findSecurity(db(), ticker) : null;
     if (!security) return fail("ticker");
+    // Form 4s are matched by the issuer's CIK.
+    if (ownership && !security.cik) return fail("cik");
     securityId = security.securityId;
   }
 

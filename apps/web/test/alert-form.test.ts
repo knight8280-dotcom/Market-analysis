@@ -34,6 +34,15 @@ describe("definitionFrom", () => {
       kind: "screen_membership",
       params: { change: "enters" },
     });
+    expect(definitionFrom(form({ kind: "insider_purchase", minValue: "$250,000" }))).toEqual({
+      kind: "insider_purchase",
+      params: { minValue: 250_000 },
+    });
+    // Blank means any purchase.
+    expect(definitionFrom(form({ kind: "insider_purchase", minValue: " " }))).toEqual({
+      kind: "insider_purchase",
+      params: { minValue: 0 },
+    });
   });
 
   it("collects filing forms from the boxes and the free text, each once", () => {
@@ -65,6 +74,8 @@ describe("definitionFrom", () => {
       { kind: "new_filing" },
       { kind: "new_filing", otherForms: "10-K/A" },
       { kind: "screen_membership", change: "stays" },
+      { kind: "insider_purchase", minValue: "-1" },
+      { kind: "insider_purchase", minValue: "lots" },
     ];
     for (const bad of cases) {
       expect(definitionFrom(form(bad)), JSON.stringify(bad)).toBeNull();

@@ -41,6 +41,7 @@ export const CONDITION_HELP: Record<AlertKind, string> = {
   new_filing:
     "Pick at least one form (20 at most). Type other forms by their EDGAR names, such as 424B2; amendments are covered by the box below them.",
   screen_membership: "Pick one of your saved screens.",
+  insider_purchase: "Enter a dollar amount from 0 (any purchase) up to $10 billion.",
 };
 
 const text = (form: FormLike, name: string) => {
@@ -99,6 +100,9 @@ export function definitionFrom(form: FormLike): AlertDefinition | null {
         return { forms: chosenForms(form), amendments: text(form, "amendments") === "on" };
       case "screen_membership":
         return { change: text(form, "change") || "either" };
+      case "insider_purchase":
+        // Blank means any purchase.
+        return { minValue: text(form, "minValue") === "" ? 0 : num(form, "minValue") };
     }
   })();
   const parsed = AlertDefinition.safeParse({ kind, params: raw });

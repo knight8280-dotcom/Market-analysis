@@ -8,6 +8,7 @@ import {
 import { z } from "zod";
 import type { WorkerContext } from "../context";
 import { JOBS, jobId } from "../queues";
+import { queueAlertEvaluation } from "./alerts";
 import { pendingInsiderFilings, recordInsiderError, storeInsiderFiling } from "../repo/insiders";
 import { resolveSource, withProviderHealth } from "../routing";
 
@@ -90,6 +91,23 @@ export async function ingestInsiderFiling(ctx: WorkerContext, raw: unknown) {
     filedAt: filing.filed_at,
     parserVersion: INSIDER_PARSER_VERSION,
   });
+  // An open-market purchase is checked against insider-purchase alerts at once (step H4).
+  const purchase = parsed.transactions.some(
+    (t) => t.code === "P" && !t.derivative && t.acquired_disposed === "A",
+  );
+  if (stored && purchase && parsed.form_type === "4") {
+    const securities = await ctx.db
+      .selectFrom("market.securities")
+      .select("security_id")
+      .where("cik", "=", parsed.issuer_cik)
+      .execute();
+    await queueAlertEvaluation(ctx, {
+      trigger: "insiders",
+      runId: accession_no,
+      securityIds: securities.map((s) => s.security_id),
+      kinds: ["insider_purchase"],
+    });
+  }
   return {
     accession_no,
     status: stored ? ("read" as const) : ("already_read" as const),

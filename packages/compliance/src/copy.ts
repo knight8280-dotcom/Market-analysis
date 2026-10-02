@@ -4,7 +4,7 @@ import { formatDate } from "@market/ui";
  * Compliance copy registry (spec §12). Every disclaimer and label is defined once here so pages
  * cannot drift from the approved wording.
  */
-export type DelayKind = "eod" | "delayed" | "realtime" | "filing" | "observation";
+export type DelayKind = "eod" | "delayed" | "realtime" | "filing" | "observation" | "settlement";
 
 export const COPY = {
   sampleDataBanner:
@@ -27,9 +27,23 @@ export const COPY = {
         return `As filed, ${formatDate(asOf)}`;
       case "observation":
         return `As of ${formatDate(asOf)}`;
+      case "settlement":
+        return `Settlement date ${formatDate(asOf)}`;
     }
   },
   source: (name: string) => `Source: ${name}`,
+  /**
+   * §5.13 label for 13F holdings, verbatim; a table of many filers' positions gives the range of
+   * their filing dates.
+   */
+  thirteenF: (quarterEnd: string, filed: string, lastFiled: string = filed) =>
+    `As of quarter end ${formatDate(quarterEnd)}, filed ${formatDate(filed)}${lastFiled === filed ? "" : ` to ${formatDate(lastFiled)}`}; 13F data is reported up to 45 days after quarter end.`,
+  /** §2.5: short interest always shows its settlement date. */
+  shortInterest: (settlement: string) =>
+    `Settlement date ${formatDate(settlement)}. FINRA publishes short interest about a week after each settlement date.`,
+  /** Under insider tables and alerts on them (spec §5.13: descriptive, §13: no signals). */
+  insiderNote:
+    "Transactions as reported on Form 4. Shown as filed, for information only: not a signal or a recommendation.",
   personalUse: "Personal use only. Licensed for the owner's own screen.",
   /** Lightweight Charts NOTICE (Apache-2.0), shown with a link to tradingview.com (§12). */
   chartAttribution: "TradingView Lightweight Charts™. Copyright (с) 2025 TradingView, Inc.",

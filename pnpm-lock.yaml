@@ -68,6 +68,9 @@ importers:
       '@market/market-data':
         specifier: workspace:*
         version: link:../../packages/market-data
+      '@market/ownership':
+        specifier: workspace:*
+        version: link:../../packages/ownership
       '@market/portfolio':
         specifier: workspace:*
         version: link:../../packages/portfolio

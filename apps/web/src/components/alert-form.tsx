@@ -1,6 +1,6 @@
 "use client";
 
-import { KIND_LABELS, PHASE2_KINDS, type AlertKind } from "@market/alerts";
+import { KIND_LABELS, OWNERSHIP_KINDS, PHASE2_KINDS, type AlertKind } from "@market/alerts";
 import { Button, Input } from "@market/ui";
 import Link from "next/link";
 import { useState } from "react";
@@ -13,7 +13,10 @@ const GROUPS: { label: string; kinds: AlertKind[] }[] = [
     label: "Indicators and volume",
     kinds: ["rsi_below", "rsi_above", "sma_cross", "volume_spike"],
   },
-  { label: "Events", kinds: ["earnings_upcoming", "new_filing", "screen_membership"] },
+  {
+    label: "Events",
+    kinds: ["earnings_upcoming", "new_filing", "insider_purchase", "screen_membership"],
+  },
 ];
 
 const field = "flex flex-col gap-1 text-sm";
@@ -23,21 +26,25 @@ const select =
 
 /**
  * New-alert form: the fields follow the chosen condition, and the server validates on submit
- * with the same rules (lib/alert-form). Phase 2 kinds appear while the `alert_types` flag is on.
+ * with the same rules (lib/alert-form). Phase 2 kinds appear while the `alert_types` flag is on,
+ * and the insider-purchase kind while the `ownership` flag is on as well.
  */
 export function AlertForm({
   ticker,
   kind: initialKind,
   moreKinds,
+  ownership,
   screens,
 }: {
   ticker?: string;
   kind?: string;
   moreKinds: boolean;
+  ownership: boolean;
   screens: { id: string; name: string }[];
 }) {
   const offered = (k: AlertKind) =>
-    moreKinds || !(PHASE2_KINDS as readonly AlertKind[]).includes(k);
+    (moreKinds || !(PHASE2_KINDS as readonly AlertKind[]).includes(k)) &&
+    (ownership || !(OWNERSHIP_KINDS as readonly AlertKind[]).includes(k));
   const [kind, setKind] = useState<AlertKind>(
     initialKind && isAlertKind(initialKind) && offered(initialKind) ? initialKind : "price_above",
   );
@@ -223,6 +230,20 @@ function Fields({ kind, screens }: { kind: AlertKind; screens: { id: string; nam
             </label>
           </div>
         </fieldset>
+      );
+    case "insider_purchase":
+      return (
+        <>
+          <label className={field}>
+            <span className={caption}>At least (USD, at the filed prices)</span>
+            <Input name="minValue" inputMode="decimal" defaultValue={0} />
+          </label>
+          <p className="text-xs text-muted-foreground sm:col-span-1 lg:col-span-3">
+            Fires when a Form 4 filed with SEC EDGAR reports an open-market purchase (code P) of the
+            company&apos;s stock; 0 means any purchase. Checked as the evening&apos;s EDGAR refresh
+            (from 21:00 ET) reads new Form 4s.
+          </p>
+        </>
       );
     case "screen_membership":
       return screens.length === 0 ? (

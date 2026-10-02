@@ -3,7 +3,8 @@ import { z } from "zod";
 /**
  * Alert conditions. Phase 1 (steps I1-I3): price levels, one-day moves and earnings dates.
  * Phase 2 (step E1): RSI and moving-average crossings, volume spikes, new SEC filings and
- * changes in a saved screen's results. Prices are end-of-day closes.
+ * changes in a saved screen's results; (step H4) open-market purchases reported on Form 4.
+ * Prices are end-of-day closes.
  */
 export const ALERT_KINDS = [
   "price_above",
@@ -16,6 +17,7 @@ export const ALERT_KINDS = [
   "volume_spike",
   "new_filing",
   "screen_membership",
+  "insider_purchase",
 ] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
@@ -27,7 +29,11 @@ export const PHASE2_KINDS = [
   "volume_spike",
   "new_filing",
   "screen_membership",
+  "insider_purchase",
 ] as const satisfies readonly AlertKind[];
+
+/** Kinds that also need the `ownership` flag (insider data, Phase 2 step H4). */
+export const OWNERSHIP_KINDS = ["insider_purchase"] as const satisfies readonly AlertKind[];
 
 /** Kinds evaluated on the adjusted daily series (indicators and volume). */
 export const SERIES_KINDS = [
@@ -59,6 +65,7 @@ export const KIND_LABELS: Record<AlertKind, string> = {
   volume_spike: "Volume spike",
   new_filing: "New SEC filing",
   screen_membership: "Screen results change",
+  insider_purchase: "Insider buys on the open market",
 };
 
 const price = z.number().finite().positive().max(10_000_000);
@@ -141,6 +148,14 @@ export const AlertDefinition = z.discriminatedUnion("kind", [
       amendments: z.boolean(),
     }),
   }),
+  /**
+   * A Form 4 reports an open-market purchase (code P, Table I) of the company's stock, worth at
+   * least `minValue` dollars at the filed prices (0: any purchase).
+   */
+  z.object({
+    kind: z.literal("insider_purchase"),
+    params: z.strictObject({ minValue: z.number().finite().min(0).max(10_000_000_000) }),
+  }),
   /** Securities enter or leave the results of a saved screen (the alert's `screen_id`). */
   z.object({
     kind: z.literal("screen_membership"),
@@ -174,6 +189,8 @@ export type ScreenMember = z.infer<typeof Member>;
 export const AlertState = z.object({
   /** new_filing: filings stored up to this time have been considered (ISO timestamp). */
   filingsSeenThrough: z.iso.datetime({ offset: true }).optional(),
+  /** insider_purchase: Form 4s read up to this time have been considered (ISO timestamp). */
+  insidersSeenThrough: z.iso.datetime({ offset: true }).optional(),
   /** screen_membership: the results last reported, or the starting point. */
   screen: z
     .object({

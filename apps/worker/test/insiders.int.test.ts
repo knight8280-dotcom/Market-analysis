@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { OWNER_USER_ID } from "@market/config";
+import { sql } from "@market/db";
 import { ProviderError } from "@market/market-data";
 import { SecEdgarProvider } from "@market/market-data/adapters/sec-edgar";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -299,5 +301,73 @@ describe("sweep-insiders", () => {
       .select((eb) => eb.fn.countAll<string>().as("n"))
       .executeTakeFirstOrThrow();
     expect(Number(stored.n)).toBe(4);
+  });
+});
+
+describe("insider-purchase alerts", () => {
+  it("fire once, when a Form 4 reporting an open-market purchase is read", async () => {
+    const { security_id } = await h.t.db
+      .insertInto("market.securities")
+      .values({ ticker: "INTC", name: "Intel Corp", asset_class: "equity", cik: "0000050863" })
+      .returning("security_id")
+      .executeTakeFirstOrThrow();
+    const { rows } = await sql<{ alert_id: string }>`
+      insert into public.alerts (user_id, security_id, kind, params, cooldown_hours, created_at)
+      values (${OWNER_USER_ID}, ${security_id}, 'insider_purchase', '{"minValue": 1000000}', 0,
+              '2026-08-01T00:00:00Z')
+      returning alert_id::text
+    `.execute(h.t.db);
+    const alertId = rows[0]!.alert_id;
+    // Read the purchase again, as if it had just been filed, with its address on sec.gov.
+    await h.t.db
+      .deleteFrom("market.insider_filings")
+      .where("accession_no", "=", FILINGS[0].acc)
+      .execute();
+    await h.t.db
+      .updateTable("market.filings")
+      .set({ url: "https://www.sec.gov/Archives/edgar/data/50863/000005086326000177/form4.xml" })
+      .where("accession_no", "=", FILINGS[0].acc)
+      .execute();
+    const dispatched: JobRequest[] = [];
+    const spy = vi.spyOn(h.dispatcher, "dispatch").mockImplementation((job) => {
+      dispatched.push(job);
+      return Promise.resolve();
+    });
+    try {
+      await h.run("ingest-insider", { cik: "50863", accession_no: FILINGS[0].acc });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(dispatched.map((j) => [j.jobId, j.data])).toEqual([
+      [
+        `evaluate-alerts/insiders/${FILINGS[0].acc}`,
+        { trigger: "insiders", kinds: ["insider_purchase"], securityIds: [security_id] },
+      ],
+    ]);
+    await h.run("evaluate-alerts", dispatched[0]!.data);
+    const events = () =>
+      h.t.db
+        .selectFrom("alert_events")
+        .select(["event_key", "bar_date"])
+        .where("alert_id", "=", alertId)
+        .execute();
+    expect(await events()).toEqual([{ event_key: FILINGS[0].acc, bar_date: "2026-08-14" }]);
+    const notes = await h.t.db
+      .selectFrom("notifications as n")
+      .innerJoin("alert_events as e", "e.event_id", "n.event_id")
+      .select(["n.title", "n.body", "n.href"])
+      .where("e.alert_id", "=", alertId)
+      .execute();
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({
+      title: "Insider purchase at INTC: TAN LIP BU",
+      href: "https://www.sec.gov/Archives/edgar/data/50863/000005086326000177/form4.xml",
+    });
+    expect(notes[0]!.body).toContain(
+      "TAN LIP BU (Director, CEO) bought 105,263 shares at $95.00 on Aug 11, 2026, $9,999,985.00 at the filed prices",
+    );
+    // Evaluating again finds nothing new.
+    await h.run("evaluate-alerts", { kinds: ["insider_purchase"] });
+    expect(await events()).toHaveLength(1);
   });
 });

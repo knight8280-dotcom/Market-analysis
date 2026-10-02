@@ -23,6 +23,7 @@
     "@market/db": "workspace:*",
     "@market/indicators": "workspace:*",
     "@market/market-data": "workspace:*",
+    "@market/ownership": "workspace:*",
     "@market/portfolio": "workspace:*",
     "@market/screener": "workspace:*",
     "@market/ui": "workspace:*",

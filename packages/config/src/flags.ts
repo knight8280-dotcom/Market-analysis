@@ -39,6 +39,12 @@ export const FEATURE_FLAGS = {
       "In-app notifications when alerts fire, with snooze and delete; the bell in the header.",
     default: true,
   },
+  ownership: {
+    label: "Ownership",
+    description:
+      "Insider transactions (Form 4), institutional holders (13F) and short interest on ticker pages, and insider-purchase alerts.",
+    default: true,
+  },
   drawings: {
     label: "Chart drawings",
     description:

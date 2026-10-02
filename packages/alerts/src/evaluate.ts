@@ -38,6 +38,25 @@ export interface FilingItem {
   storedAt: Date;
 }
 
+/**
+ * A Form 4 for the alert's company with at least one open-market purchase (code P, Table I,
+ * acquired), read after the alert was created. Amendments are left out by the caller.
+ */
+export interface InsiderPurchaseFiling {
+  accessionNo: string;
+  /** EDGAR acceptance time. */
+  filedAt: Date;
+  filingDate: string;
+  url: string;
+  /** When our database read it; filings read after `state.insidersSeenThrough` are new. */
+  storedAt: Date;
+  /** The first reporting owner, and how many joined the filing ("A and 1 other"). */
+  insider: string;
+  role: string;
+  /** The purchase lines as filed. */
+  lines: { date: string; shares: number | null; price: number | null }[];
+}
+
 /** A saved screen's current results on the screener snapshot. */
 export interface ScreenResults {
   screenId: string;
@@ -68,6 +87,8 @@ export interface EvaluationInput {
   filings?: readonly FilingItem[] | null;
   /** Screen conditions. */
   screen?: ScreenResults | null;
+  /** Insider-purchase conditions; null when the company has no SEC registrant id (CIK). */
+  insiderPurchases?: readonly InsiderPurchaseFiling[] | null;
   /** What the alert remembered after its last evaluation. */
   state?: AlertState;
 }
@@ -345,6 +366,74 @@ function check(def: AlertDefinition, input: EvaluationInput): Hit | Quiet {
         summary: [
           `${ticker} filed with the SEC:`,
           ...shown.map((f) => `- ${line(f)}`),
+          ...(omitted > 0 ? [`- and ${omitted} earlier`] : []),
+        ].join("\n"),
+        href: latest.url,
+        state,
+      };
+    }
+
+    case "insider_purchase": {
+      if (!input.insiderPurchases) return NO_DATA;
+      const seen = input.state?.insidersSeenThrough
+        ? Date.parse(input.state.insidersSeenThrough)
+        : -Infinity;
+      const fresh = input.insiderPurchases.filter((f) => f.storedAt.getTime() > seen);
+      if (fresh.length === 0) return NOT_MET;
+      const state: AlertState = {
+        ...input.state,
+        insidersSeenThrough: new Date(
+          Math.max(...fresh.map((f) => f.storedAt.getTime())),
+        ).toISOString(),
+      };
+      // Shares × price over the lines that give both: what the filing itself states.
+      const value = (f: InsiderPurchaseFiling) =>
+        f.lines.reduce(
+          (sum, l) => sum + (known(l.shares) && known(l.price) ? l.shares * l.price : 0),
+          0,
+        );
+      const matches = fresh
+        .filter((f) => f.lines.length > 0 && value(f) >= def.params.minValue)
+        .sort(
+          (a, b) =>
+            a.filedAt.getTime() - b.filedAt.getTime() || a.accessionNo.localeCompare(b.accessionNo),
+        );
+      if (matches.length === 0) return { fire: false, reason: "not_met", state };
+      const latest = matches.at(-1)!;
+      const describe = (f: InsiderPurchaseFiling) => {
+        const shares = f.lines.reduce((sum, l) => sum + (l.shares ?? 0), 0);
+        const prices = [...new Set(f.lines.map((l) => l.price).filter(known))].sort(
+          (a, b) => a - b,
+        );
+        const at =
+          prices.length === 0
+            ? "(no price given)"
+            : prices.length === 1
+              ? `at ${money(prices[0]!)}`
+              : `at ${money(prices[0]!)} to ${money(prices.at(-1)!)}`;
+        const dates = [...new Set(f.lines.map((l) => l.date))].sort();
+        const when =
+          dates.length === 1 ? day(dates[0]!) : `${day(dates[0]!)} to ${day(dates.at(-1)!)}`;
+        const worth = value(f) > 0 ? `, ${cents(value(f))} at the filed prices` : "";
+        return `${f.insider} (${f.role}) bought ${shares.toLocaleString("en-US")} shares ${at} on ${when}${worth}; Form 4 accepted ${dateTimeET(f.filedAt)}`;
+      };
+      const shown = matches.slice(-10);
+      const omitted = matches.length - shown.length;
+      return {
+        key: latest.accessionNo,
+        date: latest.filingDate,
+        subject:
+          matches.length === 1
+            ? `Insider purchase at ${ticker}: ${latest.insider}`
+            : `${matches.length} insider purchases at ${ticker}`,
+        text: [
+          `Open-market purchases of ${ticker} reported on Form 4:`,
+          ...shown.map((f) => `- ${describe(f)}: ${f.url}`),
+          ...(omitted > 0 ? [`- and ${omitted} earlier`] : []),
+        ].join("\n"),
+        summary: [
+          `Open-market purchases of ${ticker} reported on Form 4:`,
+          ...shown.map((f) => `- ${describe(f)}`),
           ...(omitted > 0 ? [`- and ${omitted} earlier`] : []),
         ].join("\n"),
         href: latest.url,

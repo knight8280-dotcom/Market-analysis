@@ -6,6 +6,7 @@ import {
   createSessionToken,
   SESSION_TTL_SECONDS,
   verifySessionToken,
+  sessionCookieOptions,
 } from "../src/server/auth/session";
 import { LoginThrottle } from "../src/server/auth/throttle";
 
@@ -107,5 +108,21 @@ describe("login throttle", () => {
     expect(t.retryAfterMs(61_000)).toBe(0);
     t.reset();
     expect(t.retryAfterMs(2000)).toBe(0);
+  });
+});
+
+describe("session cookie", () => {
+  it("is Secure once the owner signs in over HTTPS, and httpOnly, Lax and host-only always", () => {
+    const tailnet = sessionCookieOptions("https://desk.example-tailnet.ts.net");
+    expect(tailnet).toEqual({
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true,
+      path: "/",
+      maxAge: SESSION_TTL_SECONDS,
+    });
+    expect(tailnet).not.toHaveProperty("domain");
+    expect(sessionCookieOptions("http://127.0.0.1:3000").secure).toBe(false);
+    expect(sessionCookieOptions(null).secure).toBe(false);
   });
 });

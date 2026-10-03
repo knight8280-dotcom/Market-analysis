@@ -5,7 +5,11 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { safeNext } from "../../server/auth/next-path";
 import { verifyPassword } from "../../server/auth/password";
-import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "../../server/auth/session";
+import {
+  createSessionToken,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+} from "../../server/auth/session";
 import { loginThrottle } from "../../server/auth/throttle";
 
 function back(error: "wrong" | "locked", next: string): never {
@@ -37,21 +41,13 @@ export async function login(formData: FormData): Promise<void> {
   }
   throttle.reset();
 
-  // Secure cookies need HTTPS; a local http://127.0.0.1 server gets a host-only, httpOnly cookie.
-  const origin = (await headers()).get("origin") ?? "";
   (await cookies()).set(
     SESSION_COOKIE,
     createSessionToken({
       sessionSecret: env.SESSION_SECRET,
       passwordHash: env.OWNER_PASSWORD_HASH,
     }),
-    {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: origin.startsWith("https://"),
-      path: "/",
-      maxAge: SESSION_TTL_SECONDS,
-    },
+    sessionCookieOptions((await headers()).get("origin")),
   );
   redirect(next);
 }

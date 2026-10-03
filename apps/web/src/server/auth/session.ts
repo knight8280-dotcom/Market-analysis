@@ -64,3 +64,18 @@ export function verifySessionToken(
     t < payload.exp
   );
 }
+
+/**
+ * How the session cookie is set: httpOnly, SameSite=Lax, host-only, for the session's lifetime;
+ * Secure when the owner signed in over HTTPS (the Tailscale address), so it is never sent over
+ * plain HTTP from then on. A local http://127.0.0.1 server cannot set a Secure cookie.
+ */
+export function sessionCookieOptions(origin: string | null) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: (origin ?? "").startsWith("https://"),
+    path: "/",
+    maxAge: SESSION_TTL_SECONDS,
+  };
+}

@@ -19,6 +19,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // `next dev` would otherwise write AGENTS.md and CLAUDE.md into this app; the project's
+  // instructions live in the repository's own CLAUDE.md.
+  agentRules: false,
   headers() {
     return Promise.resolve([{ source: "/:path*", headers: securityHeaders }]);
   },

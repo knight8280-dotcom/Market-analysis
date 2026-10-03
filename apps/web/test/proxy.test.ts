@@ -92,6 +92,55 @@ describe("owner proxy", () => {
     expect(new URL(res.headers.get("location")!).pathname).toBe("/screener");
   });
 
+  it("sends a nonce-based CSP with every response, a new nonce each time", () => {
+    const token = createSessionToken(keys);
+    const a = proxy(request("/stocks/AAPL", { cookie: token }));
+    const b = proxy(request("/stocks/AAPL", { cookie: token }));
+    const csp = a.headers.get("content-security-policy")!;
+    const nonce = /'nonce-([A-Za-z0-9+/=]{24})'/.exec(csp)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(b.headers.get("content-security-policy")).not.toContain(nonce);
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).not.toContain("unsafe-eval");
+    // Next reads the nonce from the forwarded request's header to put it on its scripts.
+    expect(a.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
+    // Redirects and refusals carry it too.
+    expect(proxy(request("/screener")).headers.get("content-security-policy")).toContain(
+      "script-src 'self' 'nonce-",
+    );
+  });
+
+  it("over HTTPS (Tailscale Serve) also tells the browser to stay on HTTPS", () => {
+    const plain = proxy(request("/login"));
+    expect(plain.headers.get("strict-transport-security")).toBeNull();
+    expect(plain.headers.get("content-security-policy")).not.toContain("upgrade-insecure-requests");
+    const req = new NextRequest("http://localhost:3000/login", {
+      headers: { host: "localhost:3000", "x-forwarded-proto": "https" },
+    });
+    const secure = proxy(req);
+    expect(secure.headers.get("strict-transport-security")).toBe("max-age=31536000");
+    expect(secure.headers.get("content-security-policy")).toContain("upgrade-insecure-requests");
+  });
+
+  it("answers the phone through Tailscale Serve once its name is allowed", () => {
+    // What Tailscale Serve forwards (its ipn/ipnlocal/serve.go): the browser's Host, plus
+    // X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-For.
+    const viaServe = () =>
+      new NextRequest("http://desk.tail1234.ts.net/login", {
+        headers: {
+          host: "desk.tail1234.ts.net",
+          "x-forwarded-host": "desk.tail1234.ts.net",
+          "x-forwarded-proto": "https",
+          "x-forwarded-for": "100.101.102.103",
+        },
+      });
+    expect(proxy(viaServe()).status).toBe(421);
+    process.env.WEB_ALLOWED_HOSTS = "desk.tail1234.ts.net";
+    const res = proxy(viaServe());
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("strict-transport-security")).toBe("max-age=31536000");
+  });
+
   it("refuses unknown host names (DNS rebinding)", () => {
     expect(proxy(request("/login", { host: "evil.example:3000" })).status).toBe(421);
     const token = createSessionToken(keys);

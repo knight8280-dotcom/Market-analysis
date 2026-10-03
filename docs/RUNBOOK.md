@@ -157,12 +157,26 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 ## Push notifications
 
 - **Set up once:** run `pnpm push:keys` and paste its two lines (`WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`) into `.env`, and set `WEB_PUSH_CONTACT` to a `mailto:` or `https:` address of yours. The contact goes to the browsers' push services (Google, Apple, Mozilla, Microsoft) with each message, so they can reach the sender; Apple requires one. Restart the app and the worker. The private key signs every message: keep it in `.env` only.
-- **Turn it on for a device:** Settings, Push notifications, "Turn on push for this device", then allow notifications when the browser asks. "Send a test notification" checks the whole path. On the computer this works at `http://localhost:3000`; on the phone it needs the private HTTPS address (step J3; this section will cover iPhone and Android then). On iPhone and iPad, add the app to the Home Screen first and turn push on from the installed app.
+- **Turn it on for a device:** Settings, Push notifications, "Turn on push for this device", then allow notifications when the browser asks. "Send a test notification" checks the whole path. On the computer this works at `http://localhost:3000`; on the phone see "Phone access (Tailscale)". On iPhone and iPad, add the app to the Home Screen first and turn push on from the installed app.
 - **Each alert chooses** email, push or both ("Send by"; both are ticked for a new alert; change it on the alert's page). Existing alerts kept email only. The alert's events show "Pushed" or "Not pushed" with the reason (not chosen, switched off, no device, daily cap).
 - **From the notification:** "Snooze 1 day" and "Delete alert" act on the alert; tapping opens it. Safari shows no buttons: tap and use the alert's page. If a button cannot reach the app (signed out, offline), the alert's page opens instead.
 - **Devices:** Settings lists every device with push on, with its last notification and last problem. A device whose browser dropped the subscription is removed by itself; "Remove" takes one off; "Turn off for this device" does both sides.
 - **"403" or "bad jwt" as a device's last problem** means the push service refuses our signature, usually because the key pair changed: turn push on again on that device. Replacing the keys means every device has to.
 - The daily cap (`ALERT_DAILY_CAP`) applies to push separately from email. "Push notifications" can be switched off on `/settings`.
+
+## Phone access (Tailscale)
+
+The phone reaches the app on your computer through Tailscale: a private HTTPS address that only your own signed-in devices can open. Nothing is published on the internet.
+
+1. **Accounts and apps:** create a free Tailscale account (Personal plan: free for personal, non-commercial use; terms read 2026-10-03). Install Tailscale on the computer that runs the app and on the phone, and sign in to both with the same account.
+2. **HTTPS:** in Tailscale's admin console, DNS page: turn on MagicDNS, then "Enable HTTPS". This publishes the computer's name and your tailnet's name (like `tail1234.ts.net`) in public certificate logs, so first give the computer a plain name (for example `desk`). The app itself stays reachable only from your devices.
+3. **Share the app on the tailnet:** with the app running on port 3000, run `tailscale serve --bg 3000` on the computer. It prints the address, for example `https://desk.tail1234.ts.net`. Use `serve`, never `funnel` (Funnel would put the app on the public internet). `tailscale serve reset` stops it.
+4. **Tell the app its address:** in `.env`, `WEB_ALLOWED_HOSTS=desk.tail1234.ts.net` (without it the app answers "Unknown host.") and `APP_BASE_URL=https://desk.tail1234.ts.net` (links in alert emails). Restart the app and the worker.
+5. **iPhone or iPad** (iOS 16.4 or later): open the address in Safari, then Share, "Add to Home Screen". Open the app from the Home Screen and sign in there (an installed app has its own sign-in). Settings, Push notifications, "Turn on push for this device", Allow, then "Send a test notification".
+6. **Android:** open the address in Chrome, then the menu, "Install app" (or "Add to Home screen"). Open it, sign in, then Settings, "Turn on push for this device", Allow, and "Send a test notification".
+7. **Day to day:** the computer must be on, with the app and the worker running. The phone needs Tailscale connected to open the app, and for a notification's buttons (they call the app); the notifications themselves arrive without it, through Apple's or Google's push service. Without a connection the app shows its offline page.
+
+**Your phone check** (the last step of J3; nothing else can test the real phone): the address opens with a padlock; the app installs and opens full screen; sign-in works; push turns on and the test notification arrives; an alert with "Push notification" ticked arrives when it fires (`pnpm worker alerts` runs the check now); on Android, "Snooze 1 day" from the notification snoozes the alert (iPhone shows no buttons: tap it instead); with Tailscale off on the phone, the app shows "You're offline".
 
 ## Portfolio
 
@@ -243,7 +257,7 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 ## Installing the app
 
 - **On the computer:** open the app in Chrome or Edge (`http://localhost:3000`), then use the install icon at the right of the address bar (or the menu: "Install Market Analysis"). It opens in its own window; sign in there once. Uninstall from the app window's menu.
-- **On the phone:** needs the private HTTPS address from step J3 (Tailscale); this section will say how once that step is done.
+- **On the phone:** see "Phone access (Tailscale)" below.
 - **Offline:** if the device loses its connection, the page on screen stays, with a banner saying when it was loaded. Opening another page shows "You're offline": the app cannot be reached from this device (no connection, not on Tailscale, or the computer is off). Nothing from the app is kept on the device; "Try again" reloads once the connection is back.
 - **On a phone-sized screen** the navigation is a bar at the bottom; "More" holds the sections not in the bar.
 - **A page that looks out of date after an update:** reload it; the service worker updates itself on the next page load. To remove it entirely: the browser's site settings for the app's address, "Clear data" (or DevTools, Application, Service workers, Unregister).

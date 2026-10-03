@@ -154,6 +154,16 @@ Watchlists update in place when the worker loads new bars, if the web app has `R
 - **More alert types** (RSI, moving averages, volume, filings, screens) and **Notifications** can be switched off on `/settings`; while "More alert types" is off, those alerts are not checked.
 - **Insider purchases** ("Insider buys on the open market", also from "Alert on insider purchases" on a ticker's Ownership tab): fires when a Form 4 reports an open-market purchase worth at least the amount you set at the filed prices (0 for any). It is checked as soon as the evening EDGAR refresh reads the Form 4, so it needs EDGAR (see Insider transactions below). It reports only filings accepted after the alert was created, and needs a security with a CIK (ETFs and funds have none). Turning off "Ownership" or "More alert types" stops it.
 
+## Push notifications
+
+- **Set up once:** run `pnpm push:keys` and paste its two lines (`WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`) into `.env`, and set `WEB_PUSH_CONTACT` to a `mailto:` or `https:` address of yours. The contact goes to the browsers' push services (Google, Apple, Mozilla, Microsoft) with each message, so they can reach the sender; Apple requires one. Restart the app and the worker. The private key signs every message: keep it in `.env` only.
+- **Turn it on for a device:** Settings, Push notifications, "Turn on push for this device", then allow notifications when the browser asks. "Send a test notification" checks the whole path. On the computer this works at `http://localhost:3000`; on the phone it needs the private HTTPS address (step J3; this section will cover iPhone and Android then). On iPhone and iPad, add the app to the Home Screen first and turn push on from the installed app.
+- **Each alert chooses** email, push or both ("Send by"; both are ticked for a new alert; change it on the alert's page). Existing alerts kept email only. The alert's events show "Pushed" or "Not pushed" with the reason (not chosen, switched off, no device, daily cap).
+- **From the notification:** "Snooze 1 day" and "Delete alert" act on the alert; tapping opens it. Safari shows no buttons: tap and use the alert's page. If a button cannot reach the app (signed out, offline), the alert's page opens instead.
+- **Devices:** Settings lists every device with push on, with its last notification and last problem. A device whose browser dropped the subscription is removed by itself; "Remove" takes one off; "Turn off for this device" does both sides.
+- **"403" or "bad jwt" as a device's last problem** means the push service refuses our signature, usually because the key pair changed: turn push on again on that device. Replacing the keys means every device has to.
+- The daily cap (`ALERT_DAILY_CAP`) applies to push separately from email. "Push notifications" can be switched off on `/settings`.
+
 ## Portfolio
 
 - `/portfolio`: create a portfolio (benchmark ticker defaults to SPY), then add transactions by hand or import a CSV. Returns, allocation and dividends are calculated on each page load from the entries and end-of-day closes (ADR-023).

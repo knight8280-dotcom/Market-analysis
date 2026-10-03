@@ -25,6 +25,7 @@
     "@market/market-data": "workspace:*",
     "@market/ownership": "workspace:*",
     "@market/portfolio": "workspace:*",
+    "@market/push": "workspace:*",
     "@market/screener": "workspace:*",
     "@market/ui": "workspace:*",
     "@market/valuation": "workspace:*",

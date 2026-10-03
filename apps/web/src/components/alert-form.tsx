@@ -5,7 +5,13 @@ import { Button, Input } from "@market/ui";
 import Link from "next/link";
 import { useState } from "react";
 import { createAlert } from "../app/(app)/alerts/actions";
-import { FORM_CHOICES, isAlertKind } from "../lib/alert-form";
+import {
+  CHANNEL_LABELS,
+  CHANNELS,
+  FORM_CHOICES,
+  isAlertKind,
+  type Channel,
+} from "../lib/alert-form";
 
 const GROUPS: { label: string; kinds: AlertKind[] }[] = [
   { label: "Price", kinds: ["price_above", "price_below", "pct_move"] },
@@ -34,12 +40,15 @@ export function AlertForm({
   kind: initialKind,
   moreKinds,
   ownership,
+  push,
   screens,
 }: {
   ticker?: string;
   kind?: string;
   moreKinds: boolean;
   ownership: boolean;
+  /** Offer push next to email (the `push` flag). */
+  push: boolean;
   screens: { id: string; name: string }[];
 }) {
   const offered = (k: AlertKind) =>
@@ -93,6 +102,8 @@ export function AlertForm({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" key={kind}>
         <Fields kind={kind} screens={screens} />
       </div>
+
+      {push ? <ChannelChoice /> : <input type="hidden" name="channels" value="email" />}
 
       <div className="flex flex-wrap items-end gap-3">
         <label className={field}>
@@ -277,4 +288,30 @@ function Fields({ kind, screens }: { kind: AlertKind; screens: { id: string; nam
         </>
       );
   }
+}
+
+/**
+ * Email, push or both (Phase 2 step J2). Both are ticked to start with; the in-app notification
+ * comes either way. Shared by the new-alert form and the alert's page.
+ */
+export function ChannelChoice({ chosen = CHANNELS }: { chosen?: readonly Channel[] }) {
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <legend className={caption}>Send by</legend>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {CHANNELS.map((c) => (
+          <label key={c} className="flex min-h-8 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="channels"
+              value={c}
+              defaultChecked={chosen.includes(c)}
+              className="size-4"
+            />
+            {c === "push" ? "Push notification" : CHANNEL_LABELS[c]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }

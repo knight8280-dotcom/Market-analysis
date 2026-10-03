@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { chosenForms, definitionFrom, safeReturnPath, SNOOZE_CHOICES } from "../src/lib/alert-form";
+import {
+  channelsFrom,
+  chosenForms,
+  definitionFrom,
+  safeReturnPath,
+  SNOOZE_CHOICES,
+} from "../src/lib/alert-form";
 
 /** The new-alert form's fields → definitions (Phase 2 step E1), and safe return paths (E3). */
 function form(fields: Record<string, string | string[]>): FormData {
@@ -107,5 +113,15 @@ describe("safeReturnPath", () => {
       { hours: 72, label: "3 days" },
       { hours: 168, label: "1 week" },
     ]);
+  });
+});
+
+describe("channelsFrom", () => {
+  it("reads email and push in a fixed order, push only while it is switched on", () => {
+    expect(channelsFrom(form({ channels: ["push", "email"] }), true)).toEqual(["email", "push"]);
+    expect(channelsFrom(form({ channels: ["push"] }), true)).toEqual(["push"]);
+    expect(channelsFrom(form({ channels: ["push"] }), false)).toEqual([]);
+    expect(channelsFrom(form({ channels: ["email", "sms"] }), true)).toEqual(["email"]);
+    expect(channelsFrom(form({}), true)).toEqual([]);
   });
 });

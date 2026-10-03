@@ -67,7 +67,7 @@ describe("sendPush", () => {
     expect(token.valid).toBe(true);
     expect(token.publicKey).toBe(vapid.publicKey);
     expect(token.claims.aud).toBe("https://fcm.googleapis.com");
-    const text = decryptPayload(sent!.init.body as Buffer, { ...target, privateKey });
+    const text = decryptPayload(sent!.init.body as Uint8Array, { ...target, privateKey });
     expect(JSON.parse(text.toString())).toEqual(request.payload);
   });
 

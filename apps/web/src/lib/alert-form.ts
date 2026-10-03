@@ -120,3 +120,17 @@ export function safeReturnPath(raw: string | null | undefined, fallback = "/aler
   if (!raw) return fallback;
   return /^\/(alerts(\/\d{1,18})?|notifications)$/.test(raw) ? raw : fallback;
 }
+
+/** How an alert can reach the owner besides the in-app notifications (Phase 2 step J2). */
+export const CHANNELS = ["email", "push"] as const;
+export type Channel = (typeof CHANNELS)[number];
+export const CHANNEL_LABELS: Record<Channel, string> = { email: "Email", push: "Push" };
+
+/**
+ * The channels ticked in a form, in a fixed order (email, then push), as the database stores
+ * them; push only while the push switch is on. Empty when nothing usable was ticked.
+ */
+export function channelsFrom(form: FormLike, pushOn: boolean): Channel[] {
+  const ticked = new Set(form.getAll("channels").filter((v) => typeof v === "string"));
+  return CHANNELS.filter((c) => ticked.has(c) && (c !== "push" || pushOn));
+}

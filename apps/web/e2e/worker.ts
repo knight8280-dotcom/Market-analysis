@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { createDb, createPool, sql } from "@market/db";
+import { e2ePushEnv } from "./push-keys";
 
 /** Shared by the alert and journey specs: the worker CLI, a Resend stand-in and test data. */
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -37,11 +38,51 @@ export async function startCaptureServer() {
   };
 }
 
+export interface PushedMessage {
+  path: string;
+  headers: Record<string, string | string[] | undefined>;
+  body: Buffer;
+}
+
+/** A local HTTP server standing in for a browser's push service: keeps each message, answers 201. */
+export async function startPushService() {
+  const messages: PushedMessage[] = [];
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => {
+      messages.push({ path: req.url ?? "", headers: req.headers, body: Buffer.concat(chunks) });
+      res.writeHead(201).end();
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return {
+    messages,
+    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    close: () => server.close(),
+  };
+}
+
+/** Removes every device's push subscription from the E2E database. */
+export async function clearPushSubscriptions(): Promise<void> {
+  const pool = createPool(DATABASE_URL, { max: 1, applicationName: "e2e" });
+  try {
+    await sql`delete from public.push_subscriptions`.execute(createDb(pool));
+  } finally {
+    await pool.end();
+  }
+}
+
 /**
  * Runs `pnpm worker alerts` against the E2E database, emailing through `resendUrl`; links in the
- * emails point at `appUrl` (the app under test).
+ * emails point at `appUrl` (the app under test). With `push`, alerts are also pushed to the
+ * devices the specs subscribed (only the push spec does).
  */
-export async function runAlertsJob(resendUrl: string, appUrl?: string): Promise<string> {
+export async function runAlertsJob(
+  resendUrl: string,
+  appUrl?: string,
+  opts: { push?: boolean } = {},
+): Promise<string> {
   const { stdout } = await promisify(execFile)(
     "pnpm",
     ["--silent", "--filter", "@market/worker", "run", "cli", "alerts"],
@@ -60,6 +101,7 @@ export async function runAlertsJob(resendUrl: string, appUrl?: string): Promise<
         // emails; the cap itself is covered by the worker's integration tests.
         ALERT_DAILY_CAP: "1000",
         ...(appUrl ? { APP_BASE_URL: appUrl } : {}),
+        ...(opts.push ? e2ePushEnv() : {}),
         LOG_LEVEL: "warn",
       },
       timeout: 60_000,

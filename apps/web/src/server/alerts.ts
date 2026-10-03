@@ -1,6 +1,7 @@
 import "server-only";
 import { describeAlert, parseAlert } from "@market/alerts";
 import { OWNER_USER_ID } from "@market/config";
+import { CHANNELS, type Channel } from "../lib/alert-form";
 import { db } from "./db";
 
 /** What an alert watches: a security (by ticker) or one of the owner's saved screens. */
@@ -20,6 +21,8 @@ export interface AlertRow {
   cooldownHours: number;
   lastFiredAt: Date | null;
   createdAt: Date;
+  /** Besides the in-app notifications: email, push or both (Phase 2 step J2). */
+  channels: Channel[];
 }
 
 function alertsQuery() {
@@ -36,6 +39,7 @@ function alertsQuery() {
       "a.cooldown_hours",
       "a.last_fired_at",
       "a.created_at",
+      "a.channels",
       "a.screen_id",
       "s.ticker",
       "s.name as security_name",
@@ -64,6 +68,7 @@ function toAlert(r: Row, now: Date): AlertRow {
     cooldownHours: r.cooldown_hours,
     lastFiredAt: r.last_fired_at,
     createdAt: r.created_at,
+    channels: CHANNELS.filter((c) => r.channels.includes(c)),
   };
 }
 
@@ -93,6 +98,7 @@ export interface AlertEventRow {
   firedAt: Date;
   status: "pending" | "sent" | "failed" | "suppressed";
   error: string | null;
+  push: { status: AlertEventRow["status"]; error: string | null };
 }
 
 export async function recentAlertEvents(
@@ -111,6 +117,8 @@ export async function recentAlertEvents(
       "e.fired_at",
       "e.delivery_status",
       "e.error",
+      "e.push_status",
+      "e.push_error",
       "s.ticker",
       "sc.name as screen_name",
     ])
@@ -130,6 +138,7 @@ export async function recentAlertEvents(
     firedAt: r.fired_at,
     status: r.delivery_status as AlertEventRow["status"],
     error: r.error,
+    push: { status: r.push_status as AlertEventRow["status"], error: r.push_error },
   }));
 }
 

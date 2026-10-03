@@ -25,6 +25,7 @@ export const PAGE_ROUTES: Record<string, string> = {
 };
 
 export const API_ROUTES: Record<string, string> = {
+  "/api/alerts/[id]": "/api/alerts/1",
   "/api/calendar": "/api/calendar?tab=earnings",
   "/api/notifications/unread": "/api/notifications/unread",
   "/api/search": "/api/search?q=TEST",

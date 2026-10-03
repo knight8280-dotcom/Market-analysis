@@ -74,6 +74,9 @@ importers:
       '@market/portfolio':
         specifier: workspace:*
         version: link:../../packages/portfolio
+      '@market/push':
+        specifier: workspace:*
+        version: link:../../packages/push
       '@market/screener':
         specifier: workspace:*
         version: link:../../packages/screener

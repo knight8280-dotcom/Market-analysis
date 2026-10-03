@@ -60,7 +60,8 @@ export async function sendPush(
   if (request.topic !== undefined && !TOPIC.test(request.topic)) {
     throw new Error("A push topic is 1 to 32 base64url characters");
   }
-  const body = encryptPayload(Buffer.from(JSON.stringify(request.payload)), target);
+  // A plain Uint8Array: what both Node's and the DOM's fetch types take as a body.
+  const body = new Uint8Array(encryptPayload(Buffer.from(JSON.stringify(request.payload)), target));
   const headers: Record<string, string> = {
     Authorization: vapidAuthorization(
       target.endpoint,

@@ -280,7 +280,7 @@ export async function evaluateAlerts(ctx: WorkerContext, raw: unknown) {
     counts.rows_inserted = outcome.fired;
 
     const delivery = await deliverPending(ctx, now, today);
-    const push = await deliverPushPending(ctx, now, today);
+    const push = await deliverPushPending(ctx, now, today, flags.push);
     counts.rows_updated = delivery.sent + push.sent;
     // Let the queue retry; firing is idempotent and delivery resumes where it stopped. A push
     // service that refuses a message is recorded, not retried by the queue: it would refuse
@@ -651,7 +651,12 @@ const PUSH_TTL_SECONDS = 24 * 3600;
  * push service no longer knows are removed; the others keep their latest error for the
  * settings page.
  */
-async function deliverPushPending(ctx: WorkerContext, now: Date, today: string) {
+async function deliverPushPending(
+  ctx: WorkerContext,
+  now: Date,
+  today: string,
+  switchedOn: boolean,
+) {
   const d = ctx.alertDelivery;
   const sender = d?.push ?? null;
   const pending = await sql<{
@@ -694,6 +699,10 @@ async function deliverPushPending(ctx: WorkerContext, now: Date, today: string) 
   for (const e of pending.rows) {
     if (!e.channels.includes("push")) {
       await suppress(e.event_id, "push not chosen for this alert");
+      continue;
+    }
+    if (!switchedOn) {
+      await suppress(e.event_id, "push notifications are switched off (Settings)");
       continue;
     }
     if (e.user_id !== OWNER_USER_ID) {

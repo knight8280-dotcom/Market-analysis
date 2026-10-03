@@ -51,6 +51,12 @@ export const FEATURE_FLAGS = {
       "Company news and the press releases companies file with SEC, on ticker pages, with model-estimated sentiment when an AI key is set.",
     default: true,
   },
+  push: {
+    label: "Push notifications",
+    description:
+      "Alerts as notifications on your computer and phone, with snooze and delete buttons; choose email, push or both per alert.",
+    default: true,
+  },
   drawings: {
     label: "Chart drawings",
     description:

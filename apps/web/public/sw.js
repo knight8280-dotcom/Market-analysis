@@ -7,6 +7,10 @@
  * loaded (a full load, or a page the app reports showing), so the offline page can say how old
  * the last view on this device is. Requests other than page loads (data, live updates, scripts)
  * are left alone.
+ *
+ * Push notifications (Phase 2 step J2, ADR-038): each message from our worker is shown as a
+ * notification. Its buttons snooze or delete the alert through the app's API, with the owner's
+ * session; tapping it opens the alert's page.
  */
 const VERSION = "v1";
 const META_CACHE = `market-analysis-meta-${VERSION}`;
@@ -45,6 +49,86 @@ self.addEventListener("fetch", (event) => {
   if (request.mode !== "navigate" || request.method !== "GET") return;
   event.respondWith(loadPage(event));
 });
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(showPush(event.data));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(onNotificationClick(event.action, event.notification.data || {}));
+});
+
+/** Snooze for a day, like the shortest snooze in the app. */
+const ACTIONS = [
+  { action: "snooze", title: "Snooze 1 day" },
+  { action: "delete", title: "Delete alert" },
+];
+
+function readPush(data) {
+  try {
+    const message = data ? data.json() : null;
+    return message && typeof message.title === "string" ? message : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Only paths in this app are opened from a notification. */
+function appPath(path) {
+  return typeof path === "string" && /^\/(?![/\\])/.test(path) ? path : "/notifications";
+}
+
+async function showPush(data) {
+  const message = readPush(data);
+  if (!message) {
+    // Browsers expect every push to show something; never stay silent.
+    return self.registration.showNotification(BRAND, {
+      body: "Something new: open the app to see it.",
+      tag: "market-analysis",
+    });
+  }
+  const alertId = Number.isInteger(message.alertId) ? message.alertId : null;
+  return self.registration.showNotification(message.title.slice(0, 120), {
+    body: typeof message.body === "string" ? message.body.slice(0, 400) : "",
+    tag: typeof message.tag === "string" ? message.tag : undefined,
+    icon: "/icon/192",
+    data: { url: appPath(message.url), alertId },
+    actions: alertId === null ? [] : ACTIONS,
+  });
+}
+
+async function onNotificationClick(action, data) {
+  if ((action === "snooze" || action === "delete") && Number.isInteger(data.alertId)) {
+    const done = await fetch(`/api/alerts/${data.alertId}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    })
+      .then((res) => res.ok)
+      .catch(() => false);
+    // Signed out or offline: open the alert, where the same buttons are.
+    if (!done) await openApp(data.url);
+    return;
+  }
+  await openApp(data.url);
+}
+
+async function openApp(path) {
+  const url = new URL(appPath(path), self.location.origin).href;
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
+  if (open) {
+    await open.focus();
+    if ("navigate" in open) {
+      // A window this worker does not control cannot be navigated; focusing it is enough.
+      await open.navigate(url).catch(() => null);
+    }
+    return;
+  }
+  await self.clients.openWindow(url);
+}
 
 async function loadPage(event) {
   try {

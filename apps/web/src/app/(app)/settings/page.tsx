@@ -1,16 +1,21 @@
 import { FEATURE_FLAGS, FLAG_KEYS } from "@market/config";
 import { Badge, Button, Card, CardContent, CardHeader, formatDateTimeET, Td, Th } from "@market/ui";
 import type { Metadata } from "next";
+import { PushSettings } from "../../../components/push-settings";
+import { pushServiceName } from "../../../lib/push-subscription";
 import { requireOwner } from "../../../server/auth/owner";
 import { enabledFlags, flagOverrides } from "../../../server/flags";
+import { pushConfig, pushDevices } from "../../../server/push";
 import { resetFlag, setFlag } from "./actions";
 
 export const metadata: Metadata = { title: "Settings" };
 
-/** Settings (Phase 2 step A1): turn features on or off. */
+/** Settings (Phase 2 steps A1 and J2): push notifications on your devices; features on or off. */
 export default async function SettingsPage() {
   await requireOwner();
   const [flags, overrides] = await Promise.all([enabledFlags(), flagOverrides()]);
+  const push = flags.push ? pushConfig() : null;
+  const devices = push ? await pushDevices() : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -21,6 +26,37 @@ export default async function SettingsPage() {
           saved data stays.
         </p>
       </div>
+      <Card id="push" aria-labelledby="push-title">
+        <CardHeader
+          title={<span id="push-title">Push notifications</span>}
+          description="Alerts as notifications on this computer and your phone. Each alert chooses email, push or both."
+        />
+        <CardContent>
+          {!flags.push ? (
+            <p className="text-sm text-muted-foreground">
+              Push notifications are switched off (Features, below).
+            </p>
+          ) : !push ? (
+            <p className="text-sm text-muted-foreground">
+              Not set up yet: run <code>pnpm push:keys</code>, add its two lines and{" "}
+              <code>WEB_PUSH_CONTACT</code> to <code>.env</code>, then restart the app and the
+              worker (Runbook, &quot;Push notifications&quot;).
+            </p>
+          ) : (
+            <PushSettings
+              publicKey={push.publicKey}
+              devices={devices.map((d) => ({
+                id: d.id,
+                device: d.device,
+                service: pushServiceName(d.endpoint),
+                createdAt: d.createdAt.toISOString(),
+                lastSentAt: d.lastSentAt?.toISOString() ?? null,
+                lastError: d.lastError,
+              }))}
+            />
+          )}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader title="Features" />
         <CardContent>

@@ -216,6 +216,15 @@ describe("push notifications for fired alerts", () => {
     });
 
     deliver();
+    await h.t.db.insertInto("ops.feature_flags").values({ key: "push", enabled: false }).execute();
+    const switchedOff = await crossing("TEST_PUSH_OFF", ["push"]);
+    await h.run("evaluate-alerts");
+    await h.t.db.deleteFrom("ops.feature_flags").where("key", "=", "push").execute();
+    expect(await eventOf(switchedOff)).toMatchObject({
+      push_status: "suppressed",
+      push_error: "push notifications are switched off (Settings)",
+    });
+
     await h.t.db.deleteFrom("push_subscriptions").execute();
     const noDevice = await crossing("TEST_PUSH_NODEV", ["push"]);
     await h.run("evaluate-alerts");

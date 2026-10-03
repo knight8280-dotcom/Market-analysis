@@ -14,7 +14,8 @@ import { OWNER_USER_ID } from "@market/config";
 import { Screen, screenMembers } from "@market/screener";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { definitionFrom, isAlertKind, safeReturnPath } from "../../../lib/alert-form";
+import { channelsFrom, definitionFrom, isAlertKind, safeReturnPath } from "../../../lib/alert-form";
+import { deleteOwnerAlert, snoozeOwnerAlert } from "../../../server/alert-changes";
 import { audit } from "../../../server/audit";
 import { requireOwner } from "../../../server/auth/owner";
 import { db } from "../../../server/db";
@@ -52,6 +53,8 @@ export async function createAlert(form: FormData): Promise<void> {
   const def = definitionFrom(form) ?? fail("condition");
   const cooldown = CooldownHours.safeParse(Number(text(form, "cooldown") || Number.NaN));
   if (!cooldown.success) fail("cooldown");
+  const channels = channelsFrom(form, await flagEnabled("push"));
+  if (channels.length === 0) fail("channels");
 
   let securityId: string | null = null;
   let screenId: string | null = null;
@@ -90,13 +93,14 @@ export async function createAlert(form: FormData): Promise<void> {
       params: JSON.stringify(def.params),
       cooldown_hours: cooldown.data!,
       state: JSON.stringify(state),
+      channels,
     })
     .returning("alert_id")
     .executeTakeFirstOrThrow();
   await audit(
     "alert.create",
     { type: "alert", id: row.alert_id },
-    { ...(ticker && securityId ? { ticker } : { screenId }), ...def },
+    { ...(ticker && securityId ? { ticker } : { screenId }), ...def, channels },
   );
   revalidatePath("/alerts");
   back("/alerts", { created: row.alert_id });
@@ -114,20 +118,7 @@ export async function snoozeAlert(form: FormData): Promise<void> {
   const hours = Number(text(form, "hours"));
   const returnTo = safeReturnPath(text(form, "returnTo"));
   if (id && (hours === 0 || (SNOOZE_HOURS as readonly number[]).includes(hours))) {
-    const until = hours === 0 ? null : new Date(Date.now() + hours * 3_600_000);
-    const res = await db()
-      .updateTable("alerts")
-      .set({ snoozed_until: until, updated_at: new Date() })
-      .where("alert_id", "=", id)
-      .where("user_id", "=", OWNER_USER_ID)
-      .executeTakeFirst();
-    if (res.numUpdatedRows > 0n) {
-      await audit(
-        until ? "alert.snooze" : "alert.unsnooze",
-        { type: "alert", id },
-        until ? { until: until.toISOString() } : {},
-      );
-    }
+    await snoozeOwnerAlert(id, hours);
   }
   revalidatePath(returnTo);
   redirect(returnTo);
@@ -160,14 +151,28 @@ export async function deleteAlert(form: FormData): Promise<void> {
   const requested = safeReturnPath(text(form, "returnTo"));
   // The alert's own page is gone once it is deleted.
   const returnTo = id && requested === `/alerts/${id}` ? "/alerts" : requested;
-  if (id) {
-    const res = await db()
-      .deleteFrom("alerts")
-      .where("alert_id", "=", id)
-      .where("user_id", "=", OWNER_USER_ID)
-      .executeTakeFirst();
-    if (res.numDeletedRows > 0n) await audit("alert.delete", { type: "alert", id });
-  }
+  if (id) await deleteOwnerAlert(id);
   revalidatePath(returnTo);
   redirect(returnTo);
+}
+
+/** Email, push or both for an existing alert (Phase 2 step J2). */
+export async function setAlertChannels(form: FormData): Promise<void> {
+  await requireOwner();
+  const id = alertId(form);
+  const returnTo = safeReturnPath(text(form, "returnTo"));
+  const channels = channelsFrom(form, await flagEnabled("push"));
+  if (!id) redirect(returnTo);
+  if (channels.length === 0) back(returnTo, { error: "channels" });
+  const res = await db()
+    .updateTable("alerts")
+    .set({ channels, updated_at: new Date() })
+    .where("alert_id", "=", id)
+    .where("user_id", "=", OWNER_USER_ID)
+    .executeTakeFirst();
+  if (res.numUpdatedRows > 0n) {
+    await audit("alert.channels", { type: "alert", id }, { channels });
+  }
+  revalidatePath(returnTo);
+  back(returnTo, { saved: "channels" });
 }

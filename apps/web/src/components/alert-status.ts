@@ -10,3 +10,11 @@ export const EVENT_STATUS: Record<
   failed: { label: "Failed", tone: "down" },
   suppressed: { label: "Not emailed", tone: "warning" },
 };
+
+/** How an alert event's push delivery reads in lists (Phase 2 step J2). */
+export const PUSH_STATUS: typeof EVENT_STATUS = {
+  sent: { label: "Pushed", tone: "up" },
+  pending: { label: "Sending", tone: "neutral" },
+  failed: { label: "Push failed", tone: "down" },
+  suppressed: { label: "Not pushed", tone: "warning" },
+};

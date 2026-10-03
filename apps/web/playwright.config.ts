@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { e2ePushEnv } from "./e2e/push-keys";
 
 /**
  * End-to-end tests against a production build (`next build` first). The database comes from
@@ -43,6 +44,8 @@ export default defineConfig({
       DATABASE_URL: process.env.E2E_DATABASE_URL ?? process.env.DATABASE_URL ?? "",
       OWNER_PASSWORD_HASH: hash(E2E_PASSWORD),
       SESSION_SECRET: randomBytes(32).toString("base64url"),
+      // Push notifications to the specs' stand-in push service (e2e/push.spec.ts).
+      ...e2ePushEnv(),
     },
   },
 });

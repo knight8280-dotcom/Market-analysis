@@ -13,7 +13,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertForm } from "../../../components/alert-form";
-import { EVENT_STATUS } from "../../../components/alert-status";
+import { EVENT_STATUS, PUSH_STATUS } from "../../../components/alert-status";
 import { CONDITION_HELP, isAlertKind } from "../../../lib/alert-form";
 import { listAlerts, recentAlertEvents, type AlertRow } from "../../../server/alerts";
 import { requireOwner } from "../../../server/auth/owner";
@@ -30,6 +30,7 @@ const ERRORS: Record<string, string> = {
   cik: "That security has no SEC CIK, so its Form 4 filings cannot be matched to it.",
   screen: "Pick one of your saved screens.",
   cooldown: "The cooldown must be between 0 and 720 hours.",
+  channels: "Choose how to be told: email, push or both.",
 };
 
 const label = (a: AlertRow) => (a.target.type === "screen" ? a.target.name : a.target.ticker);
@@ -85,6 +86,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
             kind={kind}
             moreKinds={flags.alert_types}
             ownership={flags.ownership}
+            push={flags.push}
             screens={screens.map((s) => ({ id: s.id, name: s.name }))}
           />
           {error ? (
@@ -223,6 +225,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                     <Th>Date</Th>
                     <Th>Event</Th>
                     <Th>Email</Th>
+                    {flags.push ? <Th>Push</Th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -244,6 +247,18 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                           ) : null}
                         </span>
                       </Td>
+                      {flags.push ? (
+                        <Td>
+                          <span className="flex flex-col gap-0.5">
+                            <Badge tone={PUSH_STATUS[e.push.status].tone} className="w-fit">
+                              {PUSH_STATUS[e.push.status].label}
+                            </Badge>
+                            {e.push.error ? (
+                              <span className="text-xs text-muted-foreground">{e.push.error}</span>
+                            ) : null}
+                          </span>
+                        </Td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>

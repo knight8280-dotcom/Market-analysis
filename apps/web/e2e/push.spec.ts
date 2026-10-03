@@ -20,6 +20,9 @@ import {
  * service worker through the browser's DevTools protocol (as DevTools' "Push" button does).
  */
 test.describe.configure({ mode: "serial" });
+// Notifications need the full Chromium build: Playwright's default for headless runs, the
+// headless shell, reports them as blocked whatever permission is granted.
+test.use({ channel: "chromium" });
 test.beforeAll(clearPushSubscriptions);
 test.afterAll(clearPushSubscriptions);
 
@@ -133,6 +136,9 @@ async function deliver(page: Page, baseURL: string, payload: unknown) {
 
 async function turnOnPush(page: Page) {
   await signIn(page, "/settings");
+  expect(await page.evaluate(() => Notification.permission), "notification permission").toBe(
+    "granted",
+  );
   const card = page.getByRole("region", { name: "Push notifications" });
   await expect(card.getByText("Push notifications are off for this device.")).toBeVisible();
   await card.getByRole("button", { name: "Turn on push for this device" }).click();

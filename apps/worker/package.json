@@ -24,7 +24,7 @@
     "@market/ownership": "workspace:*",
     "@market/push": "workspace:*",
     "@market/screener": "workspace:*",
-    "bullmq": "6.3.10",
+    "bullmq": "6.3.11",
     "ioredis": "6.0.0",
     "kysely": "0.29.6",
     "pino": "10.3.1",

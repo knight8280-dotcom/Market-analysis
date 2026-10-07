@@ -24,6 +24,6 @@
   },
   "dependencies": {
     "@market/ui": "workspace:*",
-    "lucide-react": "1.49.0"
+    "lucide-react": "1.51.0"
   }
 }
